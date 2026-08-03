@@ -32,3 +32,8 @@ Python 3.12.3 (matches Project 1), ruff, full type hints, YAML→frozen dataclas
 
 ## Current gate
 Gate 0 — walking skeleton. See `docs/architecture.md` §10.
+
+## Environment
+Virtualenv at `.venv` (Python 3.12.3, matches Project 1).
+Run `source .venv/bin/activate` before any python/pip/pytest command.
+Never install into system Python.
