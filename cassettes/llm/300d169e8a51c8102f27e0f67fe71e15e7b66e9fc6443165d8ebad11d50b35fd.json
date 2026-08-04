@@ -1,0 +1,13 @@
+{
+  "key": "300d169e8a51c8102f27e0f67fe71e15e7b66e9fc6443165d8ebad11d50b35fd",
+  "request_preview": "{\"agent_role\": \"sql_analyst\", \"effort\": \"medium\", \"json_schema\": {\"additionalProperties\": false, \"properties\": {\"assumptions\": {\"items\": {\"type\": \"string\"}, \"type\": \"array\"}, \"confidence\": {\"type\": \"number\"}, \"criteria_met\": {\"items\": {\"type\": \"boolean\"}, \"type\": \"array\"}, \"sql\": {\"type\": \"string\"}}, \"required\": [\"sql\", \"assumptions\", \"criteria_met\", \"confidence\"], \"type\": \"object\"}, \"max_tokens\":",
+  "response": {
+    "cost_usd": 0.005248,
+    "input_tokens": 1289,
+    "model": "claude-sonnet-5",
+    "output_tokens": 267,
+    "stop_reason": "end_turn",
+    "text": "{\"sql\":\"SELECT COUNT(*) AS inpatient_2023_count FROM encounters WHERE LOWER(ENCOUNTERCLASS) = 'inpatient' AND START >= TIMESTAMP '2023-01-01' AND START < TIMESTAMP '2024-01-01';\",\"assumptions\":[\"The ENCOUNTERCLASS value for inpatient care is exactly 'inpatient' (case-insensitive match used to be safe)\",\"START is a TIMESTAMP column; range [2023-01-01, 2024-01-01) correctly captures the full calendar year 2023 inclusive of Dec 31\"],\"criteria_met\":[true,true,true,true,true],\"confidence\":0.9}"
+  },
+  "seam": "llm"
+}

@@ -1,0 +1,34 @@
+{
+  "key": "f6de4877e697011b83bcc668f28b4d920bee8dcba250f97ed4ff71ce122ab9a7",
+  "request_preview": "{\"arguments\": {\"query\": \"SELECT COUNT(*) AS inpatient_2023_count FROM encounters WHERE LOWER(ENCOUNTERCLASS) = 'inpatient' AND START >= TIMESTAMP '2023-01-01' AND START < TIMESTAMP '2024-01-01';\"}, \"tool\": \"run_sql\"}",
+  "response": {
+    "error": null,
+    "ok": true,
+    "structured": {
+      "elapsed_ms": 35.52066604606807,
+      "error": null,
+      "executed_sql": "SELECT COUNT(*) AS inpatient_2023_count FROM encounters WHERE LOWER(ENCOUNTERCLASS) = 'inpatient' AND START >= CAST('2023-01-01' AS TIMESTAMP) AND START < CAST('2024-01-01' AS TIMESTAMP) LIMIT 1000",
+      "ok": true,
+      "ref": {
+        "bytes_written": 250,
+        "format": "parquet",
+        "head": [
+          {
+            "inpatient_2023_count": 37
+          }
+        ],
+        "ref_id": "q001",
+        "row_count": 1,
+        "schema": [
+          {
+            "dtype": "BIGINT",
+            "name": "inpatient_2023_count"
+          }
+        ]
+      }
+    },
+    "text": "{\n  \"ok\": true,\n  \"ref\": {\n    \"ref_id\": \"q001\",\n    \"format\": \"parquet\",\n    \"schema\": [\n      {\n        \"name\": \"inpatient_2023_count\",\n        \"dtype\": \"BIGINT\"\n      }\n    ],\n    \"row_count\": 1,\n    \"head\": [\n      {\n        \"inpatient_2023_count\": 37\n      }\n    ],\n    \"bytes_written\": 250\n  },\n  \"executed_sql\": \"SELECT COUNT(*) AS inpatient_2023_count FROM encounters WHERE LOWER(ENCOUNTERCLASS) = 'inpatient' AND START >= CAST('2023-01-01' AS TIMESTAMP) AND START < CAST('2024-01-01' AS TIMESTAMP) LIMIT 1000\",\n  \"error\": null,\n  \"elapsed_ms\": 35.52066604606807\n}",
+    "tool": "run_sql"
+  },
+  "seam": "mcp"
+}
