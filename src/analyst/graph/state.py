@@ -15,6 +15,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TypedDict
 
+from opentelemetry import trace
+
 from analyst.artifacts import RunDirectory
 from analyst.contracts import (
     AgentResult,
@@ -52,6 +54,9 @@ class RunContext:
 
     task_id: str
     run_dir: RunDirectory
+    #: Threaded explicitly rather than fetched from the OTel global, which can
+    #: only be set once per process. See telemetry.setup.RunTracing.
+    tracer: trace.Tracer
     llm: LLMClient
     mcp: MCPClient
     models: ModelsConfig

@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 
-from opentelemetry import trace
-
 from analyst.contracts import GATE0_ROLES, AgentRole, Plan, SubTask
 from analyst.graph.nodes.base import estimate_tokens, node_boundary, require
 from analyst.graph.state import AnalystState, RunContext
@@ -50,7 +48,7 @@ async def planner_node(state: AnalystState, ctx: RunContext) -> AnalystState:
     spec = ctx.models.roles[ROLE]
     agent = ctx.agents.roles[ROLE]
 
-    tracer = trace.get_tracer("analyst")
+    tracer = ctx.tracer
     with (
         tracer.start_as_current_span(attrs.SPAN_NODE) as span,
         node_boundary(ROLE) as outcome,

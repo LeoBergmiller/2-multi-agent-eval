@@ -22,4 +22,9 @@ class Contract(BaseModel):
         extra="forbid",
         validate_assignment=True,
         str_strip_whitespace=True,
+        # Aliased fields (ResultRef.schema_ / "schema") must survive a
+        # dump -> load round trip. Without this, `model_dump_json()` emits the
+        # field name while validation accepts only the alias, so a contract
+        # whose entire job is crossing boundaries could not be read back.
+        populate_by_name=True,
     )

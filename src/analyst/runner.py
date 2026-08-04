@@ -82,6 +82,7 @@ async def run_task(
             ctx = RunContext(
                 task_id=task_id,
                 run_dir=run_dir,
+                tracer=tracing.tracer,
                 llm=build_llm_client(store, models),
                 mcp=ReplayingMCPClient(inner_mcp, store),
                 models=models,

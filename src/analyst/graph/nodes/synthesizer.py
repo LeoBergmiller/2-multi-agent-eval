@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 
-from opentelemetry import trace
-
 from analyst.contracts import AgentRole, Evidence, FinalAnswer
 from analyst.graph.nodes.base import estimate_tokens, node_boundary, require
 from analyst.graph.state import AnalystState, RunContext
@@ -31,7 +29,7 @@ ANSWER_SCHEMA = {
 async def synthesizer_node(state: AnalystState, ctx: RunContext) -> AnalystState:
     spec = ctx.models.roles[ROLE]
     agent = ctx.agents.roles[ROLE]
-    tracer = trace.get_tracer("analyst")
+    tracer = ctx.tracer
     results = state.get("agent_results", {})
 
     with (

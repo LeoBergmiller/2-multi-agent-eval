@@ -92,6 +92,16 @@ class JsonlFileSpanExporter(SpanExporter):
 class RunTracing:
     """Scopes a `TracerProvider` to one run directory.
 
+    Deliberately does **not** call `trace.set_tracer_provider`. OTel permits
+    that exactly once per process, so a global provider would mean only the
+    first run in a process ever produced spans — every later run would write to
+    the first run's file, silently. That is survivable when one process handles
+    one run, and it would quietly break the Gate 3 model-tier sweep, which runs
+    many tasks in one process.
+
+    Instead the tracer is handed to `RunContext` and threaded explicitly. No
+    global state, and two runs can be traced side by side.
+
     Used as a context manager so the provider is always shut down and the file
     always flushed — a truncated `spans.jsonl` would score as a missing step
     rather than as an error.
@@ -103,7 +113,6 @@ class RunTracing:
         self._provider.add_span_processor(SimpleSpanProcessor(self._exporter))
 
     def __enter__(self) -> Self:
-        trace.set_tracer_provider(self._provider)
         return self
 
     def __exit__(

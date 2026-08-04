@@ -8,8 +8,6 @@ from __future__ import annotations
 
 import json
 
-from opentelemetry import trace
-
 from analyst.contracts import AgentResult, AgentRole, ContextBundle, ResultRef
 from analyst.graph.nodes.base import args_hash, estimate_tokens, node_boundary, require
 from analyst.graph.state import AnalystState, RunContext
@@ -35,7 +33,7 @@ async def sql_analyst_node(state: AnalystState, ctx: RunContext) -> AnalystState
     plan = state["plan"]
     spec = ctx.models.roles[ROLE]
     agent = ctx.agents.roles[ROLE]
-    tracer = trace.get_tracer("analyst")
+    tracer = ctx.tracer
 
     results: dict[str, AgentResult] = dict(state.get("agent_results", {}))
     events = list(state.get("validation_events", []))
