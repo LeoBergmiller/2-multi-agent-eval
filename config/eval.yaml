@@ -1,0 +1,16 @@
+# Eval harness thresholds.
+#
+# Gate 0 scores exactly one metric (task_success). The remaining seven land at
+# Gate 1 (§10), and the sweep axes and judge config in §7.4 land later still —
+# they are absent here rather than stubbed, because a threshold for a metric
+# that is not computed is a claim the repo cannot back.
+
+# Absolute floor, per architecture.md §7.5. With a single task this is
+# necessarily 1.0 or 0.0; it becomes a meaningful rate at Gate 1's 25 tasks.
+task_success_floor: 1.0
+
+# reference_sql and ground_truth are HUMAN-VERIFIED artifacts (§13, D17). While
+# a task's ground_truth.status is still "draft", the harness reports its score
+# but refuses to count it as a pass — so an unreviewed number can never quietly
+# turn the gate green.
+require_verified_ground_truth: true

@@ -1,0 +1,46 @@
+# Model bindings and price table.
+#
+# Tiering follows architecture.md §3.2: strong for Planner/Synthesizer (plan
+# quality dominates outcome), mid for SQL Analyst. Docs Analyst and Validator
+# are Gate 1 and are deliberately absent — a binding for a node that does not
+# exist is a claim the repo cannot back.
+#
+# PRICES: $ per million tokens, verified against platform.claude.com on the
+# `checked` date below. `checked` is hashed into every run's meta.json together
+# with the prices, so editing this table makes older runs visibly priced under a
+# different table instead of silently re-costed (§9).
+#
+# Re-verify and bump `checked` before any cost figure reaches a README.
+#
+# NOTE: there is no temperature/top_p/top_k setting here, and adding one would
+# be a 400 on these models. Determinism comes from cassette replay; the live arm
+# uses n=3 plus a tolerance band (§7.5).
+
+checked: 2026-08-03
+
+roles:
+  planner:
+    id: claude-opus-5
+    effort: high
+    # Generous: max_tokens caps thinking AND response text together, and
+    # thinking is on by default. A tight budget truncates the plan mid-emit.
+    max_tokens: 16000
+    price_input_per_mtok: 5.00
+    price_output_per_mtok: 25.00
+
+  sql_analyst:
+    id: claude-sonnet-5
+    effort: medium
+    max_tokens: 8000
+    # Current listed price, not a discount off 3.00/15.00. If the introductory
+    # rate lapses the expected reversion is 3.00/15.00 — no expiry date is
+    # published, so none is asserted here.
+    price_input_per_mtok: 2.00
+    price_output_per_mtok: 10.00
+
+  synthesizer:
+    id: claude-opus-5
+    effort: high
+    max_tokens: 8000
+    price_input_per_mtok: 5.00
+    price_output_per_mtok: 25.00
