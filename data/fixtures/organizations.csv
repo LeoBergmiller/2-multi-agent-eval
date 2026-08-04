@@ -1,0 +1,6 @@
+Id,NAME,ADDRESS,CITY,STATE,ZIP,LAT,LON,PHONE,REVENUE,UTILIZATION
+bd0944dc-0f0d-54ae-9f7f-99956d91c51f,Springfield General Hospital,1 Hospital Way,Springfield,MA,01103,42.100000,-72.600000,555-0100,0.0,265
+ce75fcb0-bb9a-5ff0-a693-5729c6bae164,Worcester Regional Medical Center,22 Elm St,Worcester,MA,01608,42.230000,-72.390000,555-0101,0.0,366
+76539b6a-3137-5792-ba5e-ce38f58a091e,Lowell Community Health,77 Merrimack St,Lowell,MA,01852,42.360000,-72.180000,555-0102,0.0,663
+56c02bb7-a184-512f-b366-2011e9361734,Quincy Family Practice,310 Hancock St,Quincy,MA,02169,42.490000,-71.970000,555-0103,0.0,765
+c2c686d0-8b6c-5f18-88bc-4de67798fac7,Bay State Urgent Care,18 Center Ave,Springfield,MA,01103,42.620000,-71.760000,555-0104,0.0,487
