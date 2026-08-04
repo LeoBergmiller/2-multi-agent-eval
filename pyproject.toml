@@ -1,0 +1,90 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "multi-agent-eval"
+version = "0.1.0"
+description = "Multi-agent healthcare operations analyst with trajectory-first evaluation"
+requires-python = "==3.12.*"
+
+# Floors state the major we actually build and test against, not the oldest
+# version that might work. uv.lock carries the exact resolution.
+dependencies = [
+    # Orchestration
+    "langgraph>=1.2",
+    "langgraph-checkpoint-sqlite>=3.1",
+    # LLM client (cassette seam 1)
+    "anthropic>=0.120",
+    # MCP server + client (cassette seam 2)
+    "mcp>=2.0",
+    # Warehouse + SQL guards
+    "duckdb>=1.5",
+    "sqlglot>=30.14",
+    # Contracts + config
+    "pydantic>=2.13",
+    "pyyaml>=6.0",
+    # Telemetry
+    "opentelemetry-sdk>=1.44",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1",
+    "ruff>=0.16",
+    "mypy>=2.3",
+    "types-pyyaml>=6.0",
+]
+
+# Floors above are declared intent; `uv.lock` carries the exact resolution and is
+# committed. Cassettes pin what the models returned, not what langgraph and mcp
+# resolve to — a version drift that broke replay would present as a cassette bug.
+# See D22.
+
+# TODO(gate-1): add the `rag` extra once Project 1 is tagged for release.
+#   rag = ["rag-eval @ git+https://github.com/<owner>/1-rag-evaluation@<tag>"]
+# Deliberately absent at Gate 0: a git pin to a tag that does not exist yet
+# would break `pip install -e ".[rag]"` for every clone. See architecture.md §5,
+# §14 and the Gate 0 plan (concern #6). CI never installs this extra.
+
+[tool.hatch.build.targets.wheel]
+# Two package roots: the system under test and the harness that measures it.
+# They are deliberately not in one namespace — see D22.
+packages = ["src/analyst", "evals"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+# ruff formats Python embedded in Markdown. docs/architecture.md and
+# docs/decisions.md are locked specification documents whose code blocks are
+# illustrative — reformatting them produces spurious churn in a spec and buries
+# real edits. Never let the formatter touch prose.
+extend-exclude = ["docs/", "*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "ANN", "RUF"]
+ignore = [
+    "ANN401",  # Any is legitimate in the span-attribute and findings surfaces
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ANN"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = "src"
+packages = ["analyst", "evals"]
+
+[[tool.mypy.overrides]]
+# These ship incomplete or absent stubs; we still type our own call sites.
+module = ["duckdb.*", "langgraph.*", "mcp.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+addopts = "-q --strict-markers"
+markers = [
+    "integration: load-bearing end-to-end tests (replay hermeticity, cassette miss)",
+]

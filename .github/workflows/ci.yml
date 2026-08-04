@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    # HERMETICITY: this job deliberately has NO `env:` block and NO reference to
+    # secrets.ANTHROPIC_API_KEY. That absence is the proof — the suite runs the
+    # smoke task in replay mode against committed cassettes, so if a cassette
+    # were ever missed the run would raise rather than silently reach the API
+    # (architecture.md §6.2, §12). Do not add the key here "just in case": doing
+    # so would let a cassette miss turn into a live call and quietly destroy the
+    # guarantee this job exists to enforce.
+    #
+    # Also note: no install of the `rag` extra. CI never needs Project 1.
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # No actions/setup-python: `uv sync` reads .python-version (3.12.3) and
+      # provisions that interpreter itself, so the runner matches local exactly.
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # --frozen installs the exact committed resolution. The runner and a clean
+      # clone therefore get an identical tree — floors alone would let CI drift
+      # onto a different langgraph/mcp than the cassettes were recorded against,
+      # and that failure would present as a cassette bug. See D22.
+      - name: Install from lockfile
+        run: uv sync --frozen
+
+      - name: Lint
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+          uv run mypy
+
+      - name: Build fixture warehouse
+        run: uv run python -m data.load_fixtures
+
+      - name: Test
+        run: uv run pytest
