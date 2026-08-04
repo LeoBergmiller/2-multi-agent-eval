@@ -1,0 +1,63 @@
+# Gate 0 task.
+#
+# ADMISSIBILITY (architecture.md §2): a task is admissible only if its ground
+# truth is fully determined by (reference SQL + the metrics dictionary). The
+# metrics dictionary is a Gate 1 deliverable, so at Gate 0 that reduces to
+# reference SQL alone — which is why this task names its encounter class
+# explicitly and avoids every definition-laden term. No "admission", no length
+# of stay, no readmission window. Those arrive with the dictionary.
+#
+# The task is still non-trivial. Six of the 37 matching encounters have a NULL
+# STOP (still admitted), so a query that assumes every encounter was discharged
+# returns 31. Ignoring ENCOUNTERCLASS returns 182. The traps are in the SQL, not
+# in the definition.
+
+id: gate0_inpatient_encounters_2023
+prompt: >-
+  How many inpatient encounters started in 2023?
+
+# --- HUMAN-OWNED (architecture.md §13, D17) ---------------------------------
+# reference_sql and ground_truth are human-verified artifacts. The coding agent
+# may draft and execute them; a human signs off before they become canonical.
+ground_truth:
+  value: 37
+  tolerance: 0
+
+  # Signed off by the project owner on 2026-08-03 against the verification
+  # below. Until this read "verified" the harness scored the task but refused
+  # to count it as a pass (config/eval.yaml: require_verified_ground_truth), so
+  # an unreviewed number could not quietly turn the gate green.
+  #
+  # This number is bound to the FIXTURE warehouse. When Synthea ingest replaces
+  # it at Gate 1 the value WILL change and must return to "draft" pending fresh
+  # sign-off — see the TODO in data/README.md.
+  status: verified
+
+  verification:
+    # NB: `date:`, not `on:` — YAML 1.1 parses a bare `on` key as boolean True,
+    # which silently loses the audit date.
+    - by: human
+      date: 2026-08-03
+      method: >-
+        Independent query against data/warehouse.duckdb, separate from the
+        agent run. Confirmed 37 inpatient encounters with START in 2023, of
+        which 6 have STOP IS NULL; the STOP IS NOT NULL variant returns 31.
+        year(START) resolving confirms START is a real TIMESTAMP column and the
+        nulls are genuine SQL NULLs rather than empty strings.
+
+reference_sql: |
+  SELECT count(*) AS n
+  FROM encounters
+  WHERE ENCOUNTERCLASS = 'inpatient'
+    AND START >= TIMESTAMP '2023-01-01'
+    AND START <  TIMESTAMP '2024-01-01'
+
+# --- Reference trajectory: a partial-order constraint set, not a golden path
+# (architecture.md §7.2, D18). Recorded in full so the schema does not churn
+# when the remaining metrics land, but at Gate 0 only ground_truth is scored.
+required_tools: [run_sql]
+forbidden_tools: [run_python]
+required_order: []
+min_steps: 2
+must_cite: []
+failure_injection: null

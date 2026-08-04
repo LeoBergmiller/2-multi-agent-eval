@@ -1,0 +1,17 @@
+{
+  "cassette_mode": "record",
+  "cost_usd": 0.035553,
+  "created_at": "2026-08-04T02:51:48.873206Z",
+  "git_sha": "83b005d",
+  "models": {
+    "planner": "claude-opus-5",
+    "sql_analyst": "claude-sonnet-5",
+    "synthesizer": "claude-opus-5"
+  },
+  "price_table_checked": "2026-08-03",
+  "price_table_hash": "8be8b4ba4ede5bf3",
+  "run_id": "demo-gate0",
+  "task_id": "gate0_inpatient_encounters_2023",
+  "total_input_tokens": 3220,
+  "total_output_tokens": 1093
+}

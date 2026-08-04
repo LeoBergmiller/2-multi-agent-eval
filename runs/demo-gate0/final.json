@@ -1,0 +1,18 @@
+{
+  "answer": "37 inpatient encounters started in 2023 [q001].\n\nThis was computed by counting rows in the `encounters` table where `ENCOUNTERCLASS` matched 'inpatient' (case-insensitive) and `START` fell in the range [2023-01-01, 2024-01-01) [q001].\n\nNote: this is synthetic Synthea data, so the figure describes the generated dataset only and should not be read as an epidemiological or real-world operational fact.",
+  "caveats": [
+    "Assumes the ENCOUNTERCLASS value for inpatient care is exactly 'inpatient' (a case-insensitive match was used for safety); encounters recorded under other class labels would not be counted [q001].",
+    "Assumes START is a TIMESTAMP column and that the half-open range [2023-01-01, 2024-01-01) correctly captures all of calendar year 2023 including Dec 31 [q001].",
+    "Counts encounters by start date only \\\\u2014 encounters that began in 2022 and continued into 2023 are excluded.",
+    "Synthetic (Synthea) data: not a real-world or clinical/epidemiological finding."
+  ],
+  "confidence": 0.93,
+  "evidence": [
+    {
+      "claim": "37 inpatient encounters started in 2023 [q001].\n\nThis was computed by counting rows in the `encounters` table where `ENCOUNTERCLASS` matched 'inpatient' (case-insensitive) and `START` fell in the range [2023-01-01, 2024-01-01) [q001].\n\nNote: this is synthetic Synthea data, so the figure describes the generated dataset only and should not be read as an epidemiological or real-world operational fact.",
+      "doc_id": null,
+      "result_ref": "q001"
+    }
+  ],
+  "numeric_value": 37.0
+}
