@@ -462,14 +462,18 @@ Docker Compose separately runs your own services (MCP server, app, DuckDB volume
 **Rule: do not start gate N+1 until gate N's README section is written and a run is committed to `runs/`.** Every gate ends with the repo in a defensible, true-README state.
 
 ### Gate 0 — walking skeleton
-One task, Planner → SQL Analyst → Synthesizer, one MCP tool (`run_sql`), spans landing in `runs/`, one metric (`task_success`), one test, `cost.usd` instrumented. Do not proceed until `make demo` prints an eval line.
+One task, Planner → SQL Analyst → Synthesizer, one MCP tool (`run_sql`), spans landing in `runs/`, one metric (`task_success`), one test, `cost.usd` instrumented. Plus:
+
+- **Committed CSV fixture warehouse** (`patients`, `encounters`, `organizations`) at `data/fixtures/`, using Synthea's real column names so Gate 1 is a data swap, not a rewrite. Deleted when Synthea ingest lands.
+- **Two-seam replay layer** (`CassetteStore` + LLM and MCP interceptors, `live`/`record`/`replay`) — moved up from Gate 1. §12's definition of done requires `make demo` to run from a clean clone with no API key, which is only possible if both seams already exist; and a cassette seam cannot be retrofitted without rewriting every call site. See D22.
+
+Do not proceed until `make demo` prints an eval line.
 
 ### Gate 1 — MVP COMPLETE (a full portfolio flagship on its own)
 - Synthea ingest + `messify.py` + metrics dictionary
 - MCP server: 5 tools, 2 resources, 2 prompts
 - 5 nodes, full typed contracts, bounded handoffs, ingress/egress validation
 - Replan-on-failure for one injected failure class
-- Two-seam cassette layer (`live`/`record`/`replay`)
 - Full OTel → `runs/` + sampled LangSmith
 - Eval harness: 8 deterministic metrics, 25 tasks
 - **Single-agent baseline arm**

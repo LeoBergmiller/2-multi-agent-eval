@@ -47,6 +47,14 @@ Planner/Supervisor · SQL Analyst · Docs Analyst · Quant Analyst · Synthesize
 - **Critical detail:** W3C `traceparent` propagates across the hop so remote spans join the parent trace — otherwise A2A becomes a hole in the eval.
 - **Pushback:** *"Why not A2A everywhere?"* → MCP invokes a capability; A2A delegates to an independently operated agent. Only one of my agents qualifies.
 
+### D23 — "FastMCP" no longer exists; what the MCP claim actually is
+- **Finding (build time, mcp 2.0.0):** there is no `FastMCP` class. It was renamed to `MCPServer` (`mcp.server.mcpserver`). The `@mcp.tool()` decorator shape is unchanged, so the tool signatures in architecture.md §4 are still accurate; only the class name and import path are wrong. Wire fields are also snake_case now (`input_schema`, `structured_content`, `is_error`), so 1.x examples don't port.
+- **Why this matters beyond the code:** "FastMCP" appears in architecture.md §1, §4 and §1.5, and in the portfolio framing — which means it would otherwise reach the README, a resume bullet, and a spoken interview answer. Naming a library that does not exist is the kind of detail an interviewer checks.
+- **The claim, restated:** the defensible sentence is **"I built an MCP server rather than only consuming one"** — which is D3's actual substance and is unaffected by the rename. Say "MCP server (Python `mcp` SDK)" rather than naming FastMCP. If asked about the library specifically, the honest answer is that FastMCP was folded into the official SDK as `MCPServer` in 2.x.
+- **Related choice — transport.** mcp 2.x lets a client bind an `MCPServer` object in-process, with no subprocess. It is faster and arguably more hermetic than §4's stated rationale for stdio ("hermetic, fast, no ports"), and it was **rejected for the real path**: an in-process bind never crosses a process boundary, which is precisely what makes "I built a server" more than a decorator over a function call. Gate 0 runs the server as a genuine stdio subprocess. `InProcessMCPClient` exists but is marked unit-tests-only.
+- **Pushback:** *"Isn't stdio just slower for no reason at Gate 0?"* → At this scale, yes, measurably. I paid it because the alternative quietly weakens the one claim the MCP work exists to support.
+- **Text corrections queued:** §1 (stack list), §4 (server section) and §1.5 (`server.py # FastMCP app`) all replace FastMCP with `MCPServer` / "the official `mcp` SDK".
+
 ---
 
 ## Domain and data
