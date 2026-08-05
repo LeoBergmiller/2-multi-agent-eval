@@ -31,10 +31,17 @@ def runs_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 @pytest.fixture
-def cassettes_root(tmp_path: Path) -> Path:
+def cassettes_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A tmp cassette root, also redirected globally.
+
+    The monkeypatch matters for any test that goes through `run_task`, which
+    constructs its own `CassetteStore` with no explicit root — without it a
+    RECORD test would write into the committed `cassettes/`.
+    """
     root = tmp_path / "cassettes"
     (root / "llm").mkdir(parents=True)
     (root / "mcp").mkdir(parents=True)
+    monkeypatch.setattr("analyst.replay.store.cassettes_root", lambda: root)
     return root
 
 
