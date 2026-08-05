@@ -20,12 +20,12 @@ jobs:
     # Also note: no install of the `rag` extra. CI never needs Project 1.
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # No actions/setup-python: `uv sync` reads .python-version (3.12.3) and
       # provisions that interpreter itself, so the runner matches local exactly.
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
 
@@ -43,7 +43,7 @@ jobs:
           uv run mypy
 
       - name: Build fixture warehouse
-        run: uv run python -m data.load_fixtures
+        run: uv run python data/load_fixtures.py
 
       - name: Test
         run: uv run pytest

@@ -35,8 +35,13 @@ relock:
 	uv lock
 	uv sync --frozen
 
+# Invoked by PATH, not as `-m data.load_fixtures`: `data/` is not a package and
+# is not in pyproject's packages list, so module resolution would only succeed
+# when CWD happens to put the repo root on sys.path. `make data` is in the
+# clone-and-run path, so it must not depend on where it was invoked from.
+# The script resolves its own paths from __file__, so by-path is fully portable.
 data:
-	$(PY) -m data.load_fixtures
+	$(PY) data/load_fixtures.py
 
 # Replay by default: no API key, no network — and deliberately NO dependency on
 # `data`, because a replayed run needs no warehouse at all. If this target ever
