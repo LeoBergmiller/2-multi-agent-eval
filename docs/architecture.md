@@ -28,7 +28,7 @@ An **autonomous multi-agent healthcare operations analyst** on the 2026 protocol
 
 ## 1. Stack (free-tier path)
 
-**Python 3.12.3** (pinned to match Project 1 — `rag-eval` is installed into this env at Gate 1; version drift breaks the optional extra). · LangGraph · FastMCP · DuckDB · Pydantic v2 · OpenTelemetry (GenAI semconv) · LangSmith **free tier, sampled** (viewer only) · DeepEval (CI metrics) · RAGAS (retrieval sub-eval) · **Docker sandbox only** (no E2B spend) · FastAPI · Streamlit · pytest · ruff · GitHub Actions.
+**Python 3.12.3** (pinned to match Project 1 — `rag-eval` is installed into this env at Gate 1; version drift breaks the optional extra). · LangGraph · MCP (official `mcp` SDK; `MCPServer` — FastMCP was folded into it at 2.x, see D23) · DuckDB · Pydantic v2 · OpenTelemetry (GenAI semconv) · LangSmith **free tier, sampled** (viewer only) · DeepEval (CI metrics) · RAGAS (retrieval sub-eval) · **Docker sandbox only** (no E2B spend) · FastAPI · Streamlit · pytest · ruff · GitHub Actions.
 
 **Code style:** ruff, full type hints, YAML configs deserialized into frozen dataclasses / Pydantic models, **no untyped dicts crossing module boundaries**, pytest with fixtures.
 
@@ -46,28 +46,37 @@ An **autonomous multi-agent healthcare operations analyst** on the 2026 protocol
 │   ├── models.yaml            # model IDs per role + tier presets
 │   ├── agents.yaml            # per-node prompts, budgets, tool allow-lists
 │   └── eval.yaml              # thresholds, sweep axes, judge config
-├── src/
+├── src/analyst/               # ONE package (see D22). `from analyst.x import Y`
 │   ├── contracts/             # Pydantic: TaskSpec, Plan, SubTask, Handoff,
 │   │                          #   AgentResult, FinalAnswer, ResultRef, Evidence
+│   │                          #   + config.py: YAML -> frozen models
 │   ├── graph/
 │   │   ├── nodes/             # planner, sql_analyst, docs_analyst,
 │   │   │                      #   quant_analyst, validator, synthesizer
+│   │   │                      #   + base.py: the ingress/egress boundary
+│   │   ├── state.py           # typed graph state + RunContext
 │   │   ├── router.py          # deterministic dispatch
 │   │   ├── build.py           # LangGraph assembly + checkpointer
 │   │   └── baseline.py        # single-agent ReAct arm (Gate 1)
-│   ├── mcp_server/
-│   │   ├── server.py          # FastMCP app: tools, resources, prompts
+│   ├── llm/client.py          # LLM client — cassette seam 1; cost from prices
+│   ├── mcp/                   # provider and consumer side by side
+│   │   ├── server.py          # MCPServer app: tools, resources, prompts
+│   │   ├── client.py          # MCP client — cassette seam 2
 │   │   ├── tools/             # schema, sql, retrieval, python
 │   │   └── guards.py          # sqlglot AST validation, allow-lists, limits
 │   ├── retrieval/             # RetrievalBackend protocol + RagEvalRetriever
 │   ├── sandbox/               # SandboxBackend protocol + LocalDockerSandbox
 │   ├── replay/                # CassetteStore + LLM-seam and MCP-seam interceptors
 │   ├── telemetry/             # OTel setup, span attrs, file + sampled OTLP export
-│   └── artifacts/             # ResultRef store, runs/ directory writer
-├── evals/
+│   ├── artifacts/             # ResultRef store, runs/ directory writer
+│   └── runner.py              # run one task -> a full run directory
+├── evals/                     # separate top-level package: the harness and the
+│   │                          #   system under test do not share a namespace (D22)
 │   ├── tasks/*.yaml           # task specs (HUMAN-OWNED ground truth)
+│   ├── trajectory.py          # spans.jsonl -> span tree -> Trajectory
 │   ├── metrics/               # deterministic scorers + DeepEval wrappers
 │   ├── judge/                 # rubric, pairwise runner, kappa calibration
+│   ├── runner.py              # score a run directory -> eval.json
 │   └── report.py              # eval.json -> README table
 ├── data/
 │   ├── synthea/               # generated CSVs (gitignored)
@@ -396,7 +405,7 @@ Used **only** for claim-support and answer completeness.
 - Frozen **12–15 task smoke set**, **replayed from cassettes** → deterministic, free, fast. No P1 install, no index build, no model download.
 - Full live run: nightly / manual dispatch only.
 - **Gate on regression vs. `baselines/main.json` with a tolerance band**; absolute floors as backstop: `task_success ≥ 0.85` · `tool_call_accuracy ≥ 0.90` · `trajectory_efficiency ≤ 1.5` · `loop_rate = 0` · `recovery_rate ≥ 0.70` · `cost_usd ≤ budget`.
-- Live-run nondeterminism handled with temperature 0, n=3, tolerance band — **document this openly**.
+- Live-run nondeterminism handled with **n=3, a tolerance band, and a pinned `effort` per role** — **document this openly**. (Not temperature 0: `temperature`/`top_p`/`top_k` are rejected with a 400 on the models in §3.2. The determinism guarantee is cassette replay, which is what the blocking gate uses; the tolerance band covers the nightly live arm.)
 
 ### 7.6 The baseline arm (do not skip)
 A single ReAct agent with the same MCP tools, run through the **same harness on the same task set**. Published side by side. Converts "why not one agent?" from the weakest interview question into the strongest artifact. ~half a day once tools + harness exist.

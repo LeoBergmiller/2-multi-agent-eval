@@ -181,6 +181,33 @@ Frozen 12–15 task smoke set, cassette-replayed. **Regression-gated against a c
 
 ## Scope and delivery
 
+### D22 — Gate 0 scope: fixture warehouse, replay layer, lockfile, namespace
+Four decisions taken while building Gate 0, grouped because they share one cause: §10's gate list and §12's definition of done disagreed about what "done" means.
+
+**a) The two-seam cassette layer moved from Gate 1 to Gate 0.**
+- **The conflict:** §10 listed the cassette layer under Gate 1, but §12's definition of done requires `make demo` to run from a clean clone with **no API key** — which is only possible if both seams already exist.
+- **Choice:** resolve in favour of §12; build the seams at Gate 0.
+- **Rationale:** a cassette seam cannot be retrofitted without rewriting every call site, and hermeticity that arrives late is hermeticity that was never tested. `make demo` is verified with `ANTHROPIC_API_KEY` unset, the network unused, and the warehouse file absent.
+- **Pushback:** *"Isn't that building ahead?"* → It is moving one item earlier because a later item depended on it. The rest of Gate 1 was not touched.
+
+**b) A committed CSV fixture warehouse, not Synthea, at Gate 0.**
+- **Options:** run seeded Synthea now · a small committed fixture · stub `run_sql`
+- **Choice:** a ~250-row fixture using **Synthea's real column names**, taken from `CSVConstants.java` (the class that writes the header line), not from the wiki — the wiki renders TitleCase, real output is `Id` then UPPERCASE.
+- **Rationale:** `run_sql` needs a real DuckDB before Synthea ingest exists, and matching the real schema makes Gate 1 a **data swap rather than a rewrite** of the SQL Analyst prompt, the `describe_table` shape, and the eval task. A stub would have left the guardrails untestable.
+- **Cost:** the ground truth (37) is bound to these bytes and must return to `draft` when Synthea replaces them. Enforced by a TODO in `data/README.md` and a note in the task YAML.
+
+**c) `uv` with a committed `uv.lock`.**
+- **Options:** `>=` floors only · committed lockfile
+- **Choice:** floors in `pyproject.toml` as declared intent, `uv.lock` for the resolution; `make install` and CI both run `uv sync --frozen`.
+- **Rationale:** cassettes pin what the *models* returned, not what `langgraph` and `mcp` resolve to. Those move fast — `mcp` resolved to 2.0.0 and `langgraph` to 1.2.10 at lock time — and a version drift that broke replay would present as a **cassette bug**, which is an expensive thing to debug. §12's clean-clone requirement is not met by floors alone.
+
+**d) One `analyst` package; `evals` kept separate.**
+- **Deviation from §1.5**, which implied top-level `contracts`, `graph`, `telemetry`, `replay`, `artifacts`.
+- **Choice:** `src/analyst/{contracts,llm,mcp,replay,telemetry,artifacts,graph}` plus a separate top-level `evals/`. §1.5 updated to match.
+- **Rationale:** five bare top-level names is a broad claim on the namespace. `evals/` stays outside `analyst/` deliberately: **the harness and the system under test should not share a namespace**, which is the whole framing of this project.
+
+---
+
 ### D13 — MVP cut line
 **Gate 0** walking skeleton → **Gate 1 MVP complete** (a full portfolio flagship on its own: 5 tools, 5 nodes, typed contracts, recovery, 8 metrics × 25 tasks, baseline arm, demo link, video, green CI) → **Gate 2** A2A → **Gate 3** model sweep → **Gate 4** HITL.
 - **Rule:** each gate ends with README written and a run committed. Never start gate N+1 until gate N is defensible.
