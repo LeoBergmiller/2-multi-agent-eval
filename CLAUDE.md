@@ -1,4 +1,4 @@
-# Project 2 — Multi-Agent Healthcare Ops Analyst
+# Multi-Agent Healthcare Ops Analyst
 
 Full architecture: `docs/architecture.md`. Decisions and rationale: `docs/decisions.md`.
 Read architecture.md before any non-trivial change.
@@ -31,9 +31,27 @@ agents are the subject under test.
 Python 3.12.3 (matches Project 1), ruff, full type hints, YAML→frozen dataclass/Pydantic configs, pytest.
 
 ## Current gate
-Gate 0 — walking skeleton. See `docs/architecture.md` §10.
+Gate 1 — MVP complete. See `docs/architecture.md` §10.
+**Read `docs/gate-0.md` before planning** — retrospective, deferrals, and what bit last gate.
+
+## Carried from Gate 0
+- `ground_truth` returns to `status: draft` the moment Synthea replaces the fixture. The number
+  changes and D17 applies again — a human re-signs before it counts.
+- The replan edge is a one-line change of the router's target from terminal. Not a restructure;
+  the ingress/egress boundary already records `ValidationEvent`s.
+- `evals/trajectory.py` already emits the raw signals for `loop_rate` and
+  `context_transfer_integrity` (repeated `(tool, args_hash)` pairs). Those land as scorers, not
+  as new plumbing.
+
+## Standing rule: one real `make record` per gate
+The stubbed RECORD test proves our wiring, never the vendor's wire format. A schema or SDK
+change would pass every test and only surface on a live call.
 
 ## Environment
-Virtualenv at `.venv` (Python 3.12.3, matches Project 1).
-Run `source .venv/bin/activate` before any python/pip/pytest command.
+Python 3.12.3 at `.venv` (matches Project 1), managed by **uv**.
+Install with `uv sync --frozen`; run things with `uv run …` or `.venv/bin/…`.
+**Never `pip install`.** It mutates the venv out of step with `uv.lock` and nothing fails —
+which silently voids the frozen-resolution guarantee the reproducibility claim rests on, and a
+drift that breaks replay presents as a cassette bug. To change a dependency: edit
+`pyproject.toml`, then `make relock`.
 Never install into system Python.

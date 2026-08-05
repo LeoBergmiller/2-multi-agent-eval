@@ -1,4 +1,4 @@
-# Project 2 — Architecture Decisions Log
+# Architecture Decisions Log
 
 *Interview cheat-sheet. Every entry answers "why did you choose X over Y?" Format: Options · Choice · Rationale · the pushback you'd get and how you answer it.*
 

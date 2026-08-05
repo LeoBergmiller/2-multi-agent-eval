@@ -1,4 +1,4 @@
-# Project 2 — Build Brief (Claude Code session context)
+# Build Brief (Claude Code session context)
 
 *Paste this at the start of a Claude Code build session. This is the locked architecture. All prior open items are resolved.*
 
@@ -567,7 +567,7 @@ Demo-mode, CI determinism, and the trace viewer are **one system** — the `runs
 This document is the full spec and lives at `docs/architecture.md`. Create `CLAUDE.md` at the repo root with the following — it auto-loads every session, so it must be short and durable:
 
 ```markdown
-# Project 2 — Multi-Agent Healthcare Ops Analyst
+# Multi-Agent Healthcare Ops Analyst
 
 Full architecture: `docs/architecture.md`. Decisions and rationale: `docs/decisions.md`.
 Read architecture.md before any non-trivial change.
