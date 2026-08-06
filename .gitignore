@@ -17,3 +17,4 @@ build/
 dist/
 # LangGraph checkpointer (durable execution, not memory — see D9)
 checkpoints.sqlite
+.DS_Store
