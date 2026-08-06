@@ -13,6 +13,14 @@ from typing import Any
 from analyst.mcp.client import MCPClient, ToolCallResult
 from analyst.replay.store import CassetteStore, Seam
 
+#: Tools whose result depends on the metrics-dictionary contents as well as on their
+#: arguments. §6.2 requires `corpus_version` in the key for these: the same query at the
+#: same k against an EDITED corpus is a different call, and keying on arguments alone
+#: would replay the retrieval the edit was made to correct — silently, and with the
+#: cassette looking perfectly valid. This is the one place the seam knows a tool's name,
+#: and it is knowledge the spec puts here deliberately.
+CORPUS_DEPENDENT_TOOLS: frozenset[str] = frozenset({"search_metric_definitions"})
+
 
 class ReplayingMCPClient:
     """Wraps an `MCPClient`, recording or replaying at the tool-call boundary.
@@ -30,12 +38,30 @@ class ReplayingMCPClient:
 
     SEAM: Seam = "mcp"
 
-    def __init__(self, inner: MCPClient | None, store: CassetteStore) -> None:
+    def __init__(
+        self,
+        inner: MCPClient | None,
+        store: CassetteStore,
+        corpus_version: str | None = None,
+    ) -> None:
         self._inner = inner
         self._store = store
+        self._corpus_version = corpus_version
+
+    def _payload(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        payload: dict[str, Any] = {"tool": name, "arguments": arguments}
+        if name in CORPUS_DEPENDENT_TOOLS:
+            if self._corpus_version is None:
+                raise ValueError(
+                    f"{name!r} is corpus-dependent but no corpus_version was supplied "
+                    "to the MCP seam. Keying it on arguments alone would let an edited "
+                    "definition replay a stale retrieval (§6.2)."
+                )
+            payload["corpus_version"] = self._corpus_version
+        return payload
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> ToolCallResult:
-        payload = {"tool": name, "arguments": arguments}
+        payload = self._payload(name, arguments)
 
         cached = self._store.load(self.SEAM, payload)
         if cached is not None:

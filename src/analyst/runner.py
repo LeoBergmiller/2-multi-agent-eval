@@ -36,6 +36,7 @@ from analyst.replay import (
     ReplayingMCPClient,
     build_llm_client,
 )
+from analyst.retrieval import corpus_version
 from analyst.telemetry import RunTracing, attrs
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -67,6 +68,7 @@ async def run_task(
 
     run_dir = RunDirectory(run_id)
     store = CassetteStore(mode)
+    corpus_hash = corpus_version(_repo_root() / "data" / "metrics_dictionary")
 
     with RunTracing(run_dir.spans_path) as tracing:
         async with AsyncExitStack() as stack:
@@ -84,7 +86,10 @@ async def run_task(
                 run_dir=run_dir,
                 tracer=tracing.tracer,
                 llm=build_llm_client(store, models),
-                mcp=ReplayingMCPClient(inner_mcp, store),
+                # `corpus_version` is computed from the COMMITTED corpus, so a
+                # replayed run needs neither the [rag] extra nor a built index to
+                # key its retrieval cassettes correctly (§6.2).
+                mcp=ReplayingMCPClient(inner_mcp, store, corpus_version=corpus_hash),
                 models=models,
                 agents=agents,
                 cassette_mode=mode.value,
