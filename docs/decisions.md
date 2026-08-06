@@ -228,6 +228,43 @@ Taken at the start of Gate 1a, before any code here was written against Project 
 
 **Cost, stated plainly.** P1's CI, Dockerfile and README quickstart move to `[full,dev]`/`[full]`. A `full` install behaves exactly as before. This project's `[rag]` extra still pulls torch and faiss (~1.2 GB) — unavoidable for real dense retrieval — but CI never installs the extra, so the blocking gate is unaffected.
 
+**How `v0.2.0` was verified.** P1 was tagged before CI reported, because Actions appeared not to be queueing. It was in fact only slow: the run queued roughly 50 minutes and then executed in 9m11s. **It failed — and not from anything in this change.** Four `tests/test_app.py` tests broke because `AppTest.from_file("app.py")` resolves a relative path against the CWD in streamlit 1.58.0 and against the *calling file* in 1.61+; local had 1.58.0, CI resolved 1.61.1, so the same code passed locally and looked for `tests/app.py` on the runner. Unpinned-dependency drift surfacing through a fragile relative path — recorded as P1's D14 and fixed there with an absolute path plus a streamlit pin.
+
+**`v0.2.0` stands.** On the runner, at 3.11: `ruff check`, `ruff format --check`, `mypy`, the other **112 tests**, and `python -m rag_eval.gate` all passed. The extras split is therefore **CI-verified**, on a machine that installed it from scratch — stronger evidence than the local run. The four failures were pre-existing and orthogonal, and would have failed identically on the previous commit.
+
+Two gaps remain:
+- **The `docker-build` job.** It runs in a separate job that did execute, but the Dockerfile's install line changed to `.[full]` and this needs confirming green on the re-run before the image is trusted.
+- **P1's CI pins `python-version: "3.11"` while P1's venv and this project both run 3.12.3.** CI verifies a version neither project runs — pre-existing, surfaced rather than caused by this work. Left alone deliberately: changing it in the same push that fixes a CI failure would confound the two.
+
+**What this cost, and what it bought.** Tagging on local evidence was the error, and D14's lesson is why: *an unpinned dependency means local and CI run different code, so a green local run is evidence about local only.* The tag survived, but on luck rather than method. **This project is structurally immune to that class** — `uv.lock` is committed and both CI and `make install` run `uv sync --frozen`, so the resolution that was verified is byte-for-byte the resolution that runs. That was decided at Gate 0 for reproducibility (D22c); this is the first time it has been worth something concrete, and it is the argument for the lockfile stated as an incident rather than a principle.
+
+### D25 — One MCP server subprocess per task; retrieval warmup is opt-in per spawn
+
+Decided from measurement, as required by the Gate 1a step-1 brief, not from preference. Measured on the committed 3-document corpus, `dense`, bge-base-en-v1.5 on CPU:
+
+| | |
+|---|---|
+| Cold `warmup()` (empty HF cache, fresh process) | **46.3s** |
+| Warm `warmup()` (populated cache, fresh process, n=3) | **5.18s** median (4.62 / 5.18 / 5.33) |
+| `retrieve` p50 / p95 (n=50) | **12.3ms / 13.3ms** |
+
+The brief's ~120s figure was pessimistic: cold is 46s, and it is paid once per machine. **The number that matters is warm warmup at 5.18s**, because `StdioMCPClient` spawns a fresh server subprocess per run, so warmup is charged once per *task*, not once per process. An earlier in-process reading of 1.7s understated it by ~3× — that measurement had already imported torch, transformers and faiss, and a real spawn pays those imports too. Worth recording precisely because the cheap-looking preliminary number was the misleading one.
+
+- **Options:** one server subprocess per task (status quo) · a long-lived server reused across a sweep · a warmed process pool.
+- **Choice:** keep one subprocess per task, and make retrieval **opt-in per spawn** — `StdioMCPClient` only passes `--rag-config` when retrieval is wanted, and without it the server registers `run_sql` alone and loads no model.
+- **Rationale:** 25 tasks × 5.18s ≈ 130s of warmup per live sweep arm. Live runs are dominated by model latency (multiple LLM calls per task, seconds each), so this is a modest fraction of a run that is already slow, and it buys process isolation per task — which is worth real money in a project whose Gate 3 deliverable is a multi-arm sweep whose arms must not contaminate each other. Gate 0's second defect was precisely a process-global leaking between runs; a shared long-lived server is more of that shape, not less. Opt-in retrieval also means the cost is only paid by tasks that actually look up a definition.
+- **Hermeticity does not constrain this.** The server is stateless (read-only DuckDB, read-only index) and the cassettes sit at the *client* seam, so the blocking CI gate never spawns a server at all and is unaffected either way. This is purely a live/record-path cost decision.
+- **Trigger to revisit:** if a live sweep's warmup share becomes material — Gate 3's three arms (~6.5 min of warmup), or switching the default strategy to `rerank`, which loads a *second* model at `build_retriever` time and would roughly double the figure. Re-measure before changing; do not assume.
+
+### D26 — `corpus_version` belongs in the retrieval cassette key, and the seam has to know it
+
+Found while recording the first retrieval cassette. §6.2 specifies that the retrieval cassette key includes `corpus_version`, but `ReplayingMCPClient` keyed every call on `{tool, arguments}` alone. Nothing failed — `search_metric_definitions` did not exist until now — so the gap was latent rather than broken.
+
+- **The silent-wrong it would have caused:** the same query at the same `k` against an *edited* corpus hashes identically, so correcting a definition would have replayed the retrieval the correction was made to fix, with the cassette looking perfectly valid. Editing a definition is the single most likely thing to happen to the metrics dictionary between now and Gate 1c, and step 4 rewrites it entirely.
+- **Choice:** `ReplayingMCPClient` takes a `corpus_version` and folds it into the payload for tools in `CORPUS_DEPENDENT_TOOLS`. Supplying nothing for a corpus-dependent tool **raises** — a default would silently reintroduce exactly this bug.
+- **Why the seam knows a tool name:** this is the one place it does, and it is where §6.2 puts the knowledge deliberately. The alternative — making the corpus hash a tool *argument* — would put it in the model's hands, and a model that omitted or invented it would produce the same stale replay.
+- **Cost:** none for `run_sql`, which is unaffected and tested to be. `corpus_version` hashes the **committed** corpus, so a replayed run computes it with neither the `[rag]` extra nor an index.
+
 ---
 
 ### D13 — MVP cut line
