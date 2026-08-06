@@ -1,4 +1,4 @@
-.PHONY: help install relock data demo record eval test lint fmt clean
+.PHONY: help install install-rag relock data index demo record eval test lint fmt clean
 
 VENV := .venv
 PY   := $(VENV)/bin/python
@@ -15,7 +15,10 @@ DEMO_RUN_ID := demo-gate0
 
 help:
 	@echo "make install  - sync $(VENV) from uv.lock (exact, committed resolution)"
+	@echo "make install-rag - install WITH the [rag] extra (Project 1 retrieval)"
+	@echo "                (only needed to run live or re-record; never for replay)"
 	@echo "make data     - build data/warehouse.duckdb from data/fixtures/"
+	@echo "make index    - build the metrics-dictionary index (needs [rag]; ~1.5GB models)"
 	@echo "make demo     - replay the task into runs/$(RUN_ID)/ and print the eval line"
 	@echo "                (no API key, no network, no warehouse required)"
 	@echo "make record   - LIVE run: re-record cassettes + refresh runs/$(DEMO_RUN_ID)/"
@@ -30,6 +33,13 @@ help:
 install:
 	uv sync --frozen
 
+# The [rag] extra is Project 1's retrieval core, git-pinned to a tag (D24). It pulls
+# torch + faiss (~1.2GB), so it is deliberately NOT part of `make install`: CI and
+# `make demo` run from cassettes and must never need it. Install this only to build an
+# index, run live, or re-record.
+install-rag:
+	uv sync --frozen --extra rag
+
 # Run after intentionally changing a dependency in pyproject.toml.
 relock:
 	uv lock
@@ -42,6 +52,13 @@ relock:
 # The script resolves its own paths from __file__, so by-path is fully portable.
 data:
 	$(PY) data/load_fixtures.py
+
+# Chunk + embed + index data/metrics_dictionary/ into data/index/ (gitignored).
+# Needs the [rag] extra and downloads the bge model on first run. Like `make data`,
+# this is NOT in the replay path: a replayed run resolves retrieval from cassettes and
+# never opens the index. If `make demo` ever starts needing this, replay has leaked.
+index:
+	$(PY) -m analyst.retrieval.build_index --config config/rag_eval.yaml
 
 # Replay by default: no API key, no network — and deliberately NO dependency on
 # `data`, because a replayed run needs no warehouse at all. If this target ever

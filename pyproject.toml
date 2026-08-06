@@ -41,12 +41,25 @@ dev = [
 # resolve to — a version drift that broke replay would present as a cassette bug.
 # See D22.
 
-# TODO(gate-1): add the `rag` extra once Project 1 is tagged for release.
-#   rag = ["rag-eval @ git+https://github.com/LeoBergmiller/rag-evaluation@<tag>"]
-#   <tag> is a placeholder until the release is tagged — see architecture.md §14.
-# Deliberately absent at Gate 0: a git pin to a tag that does not exist yet
-# would break `pip install -e ".[rag]"` for every clone. See architecture.md §5,
-# §14 and the Gate 0 plan (concern #6). CI never installs this extra.
+[project.optional-dependencies]
+# Project 1's retrieval core, behind `search_metric_definitions`. Git-pinned to a TAG,
+# never a local path (§5) — an absolute path breaks CI and every clone.
+#
+# v0.2.0 is the first tag that can be installed here at all: before it, rag-eval
+# declared `anthropic==0.109.1` as a hard runtime dependency, which is unsatisfiable
+# against this project's `anthropic>=0.120`, and its registry imported the LangChain
+# generation stack on every path. v0.2.0 splits that behind a `full` extra, so what
+# lands here is the framework-free retrieval core only. See D24.
+#
+# CI NEVER INSTALLS THIS. The blocking gate runs entirely from cassettes and must not
+# need P1, an index, a model download, or the network.
+rag = ["rag-eval @ git+https://github.com/LeoBergmiller/rag-evaluation@v0.2.0"]
+
+[tool.hatch.metadata]
+# Required for the git-pinned `rag` extra: hatchling rejects a direct URL reference in
+# project metadata unless this is explicitly opted into. Scoped to that one dependency —
+# every other dependency resolves from the index and is pinned by uv.lock.
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 # Two package roots: the system under test and the harness that measures it.
@@ -81,6 +94,15 @@ packages = ["analyst", "evals"]
 # These ship incomplete or absent stubs; we still type our own call sites.
 module = ["duckdb.*", "langgraph.*", "mcp.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# `rag_eval` is an OPTIONAL extra with no py.typed marker, so it is untyped when
+# present and absent entirely in CI. `follow_untyped_imports` covers the first case,
+# `ignore_missing_imports` the second — mypy must give the same answer either way, or
+# the type check would depend on whether someone happened to run `make install-rag`.
+module = ["rag_eval.*"]
+ignore_missing_imports = true
+follow_untyped_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
