@@ -17,7 +17,9 @@ help:
 	@echo "make install  - sync $(VENV) from uv.lock (exact, committed resolution)"
 	@echo "make install-rag - install WITH the [rag] extra (Project 1 retrieval)"
 	@echo "                (only needed to run live or re-record; never for replay)"
-	@echo "make data     - build data/warehouse.duckdb from data/fixtures/"
+	@echo "make synthea-jar - download + checksum-verify the pinned Synthea jar (~200MB)"
+	@echo "make data     - generate Synthea, build the warehouse, inject pathologies"
+	@echo "                (needs JDK 17+; NOT needed for make demo)"
 	@echo "make index    - build the metrics-dictionary index (needs [rag]; ~1.5GB models)"
 	@echo "make demo     - replay the task into runs/$(RUN_ID)/ and print the eval line"
 	@echo "                (no API key, no network, no warehouse required)"
@@ -45,13 +47,22 @@ relock:
 	uv lock
 	uv sync --frozen
 
-# Invoked by PATH, not as `-m data.load_fixtures`: `data/` is not a package and
+# Invoked by PATH, not as `-m data.build_warehouse`: `data/` is not a package and
 # is not in pyproject's packages list, so module resolution would only succeed
-# when CWD happens to put the repo root on sys.path. `make data` is in the
-# clone-and-run path, so it must not depend on where it was invoked from.
-# The script resolves its own paths from __file__, so by-path is fully portable.
-data:
-	$(PY) data/load_fixtures.py
+# when CWD happens to put the repo root on sys.path. The scripts resolve their own
+# paths from __file__, so by-path is fully portable.
+synthea-jar:
+	$(PY) data/fetch_synthea.py
+
+# Regenerates the warehouse deterministically from the seed, clinician seed and
+# reference date committed in data/synthea_spec.py. Needs JDK 17+ and the jar.
+#
+# `make demo` deliberately does NOT depend on this: a replayed run needs no
+# warehouse at all. If `demo` ever starts needing `data`, the replay layer has
+# sprung a leak.
+data: synthea-jar
+	$(PY) data/build_warehouse.py
+	$(PY) data/messify.py
 
 # Chunk + embed + index data/metrics_dictionary/ into data/index/ (gitignored).
 # Needs the [rag] extra and downloads the bge model on first run. Like `make data`,
