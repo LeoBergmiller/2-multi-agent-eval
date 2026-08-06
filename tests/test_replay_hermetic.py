@@ -25,7 +25,11 @@ from evals.runner import score_run
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TASK = REPO_ROOT / "evals" / "tasks" / "gate0_inpatient_encounters_2023.yaml"
-EXPECTED_ANSWER = 37.0
+#: What the COMMITTED CASSETTES replay. Deliberately not the task ground truth: the
+#: cassettes are fixture-era until step 7 re-records them, while the drafted Synthea
+#: candidate is 133. Keeping the two apart is what lets replay determinism stay
+#: provable while the ground truth is in flux.
+RECORDED_ANSWER = 37.0
 
 
 @pytest.fixture
@@ -62,7 +66,7 @@ class TestReplayIsHermetic:
         run_dir = asyncio.run(run_task(TASK, "test-replay", CassetteMode.REPLAY))
 
         final = run_dir.read_final()
-        assert final.numeric_value == EXPECTED_ANSWER
+        assert final.numeric_value == RECORDED_ANSWER
         assert final.evidence, "answer carries no provenance (rule 4)"
 
     def test_replay_needs_no_warehouse(
@@ -81,7 +85,7 @@ class TestReplayIsHermetic:
                 warehouse=Path("/nonexistent/warehouse.duckdb"),
             )
         )
-        assert run_dir.read_final().numeric_value == EXPECTED_ANSWER
+        assert run_dir.read_final().numeric_value == RECORDED_ANSWER
 
     def test_run_directory_is_complete(self, no_api_key: None, runs_root: Path) -> None:
         run_dir = asyncio.run(run_task(TASK, "test-artifacts", CassetteMode.REPLAY))
@@ -115,13 +119,40 @@ class TestReplayIsHermetic:
 
 @pytest.mark.integration
 class TestGateVerdict:
-    def test_scored_run_passes_the_gate(
+    def test_unverified_ground_truth_cannot_pass_the_gate(
         self, no_api_key: None, runs_root: Path
     ) -> None:
+        """The `require_verified_ground_truth` guard, finally exercised.
+
+        Gate 1a step 2 replaced the fixture warehouse with seeded Synthea, so this
+        task's ground truth returned to `draft` pending fresh human sign-off (D17).
+        The harness must still SCORE the run and must still REFUSE to pass it.
+
+        This assertion is stronger than the `passed is True` it replaces: nothing
+        previously exercised the refusal branch, so a guard that had silently stopped
+        working would have looked exactly like a green suite.
+        """
         asyncio.run(run_task(TASK, "test-gate", CassetteMode.REPLAY))
         report = score_run("test-gate")
-        assert report.passed
-        assert report.task_success.score == 1.0
-        assert report.task_success.ground_truth_status == "verified"
+
+        assert report.task_success.ground_truth_status == "draft"
+        assert not report.passed, "an unverified ground truth must not pass the gate"
+        # Scored, not skipped — the number is still computed and reported.
+        assert report.task_success.produced is not None
         assert report.trajectory.validation_failures == 0
         assert report.trajectory.repeated_tool_calls == 0
+
+    def test_replay_still_reproduces_the_recorded_answer(
+        self, no_api_key: None, runs_root: Path
+    ) -> None:
+        """Cassettes are fixture-era until step 7 re-records them.
+
+        The recorded answer (37) no longer matches the drafted Synthea candidate
+        (133). Separating these two staleness facts matters: replay determinism is
+        intact and provable; it is the ground truth and the cassettes that are stale.
+        """
+        asyncio.run(run_task(TASK, "test-stale", CassetteMode.REPLAY))
+        report = score_run("test-stale")
+
+        assert report.task_success.produced == 37.0
+        assert report.task_success.expected == 133.0

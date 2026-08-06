@@ -7,10 +7,15 @@
 # explicitly and avoids every definition-laden term. No "admission", no length
 # of stay, no readmission window. Those arrive with the dictionary.
 #
-# The task is still non-trivial. Six of the 37 matching encounters have a NULL
-# STOP (still admitted), so a query that assumes every encounter was discharged
-# returns 31. Ignoring ENCOUNTERCLASS returns 182. The traps are in the SQL, not
-# in the definition.
+# The task is still non-trivial. Ignoring ENCOUNTERCLASS returns 9867 against the
+# Synthea warehouse. The traps are in the SQL, not in the definition.
+#
+# STATUS AT GATE 1a STEP 2: the fixture warehouse this task was verified against
+# has been deleted and replaced by seeded Synthea. Per the carried rule in
+# CLAUDE.md the ground truth therefore returns to `draft` and does not count
+# until a human re-signs it. The still-admitted trap is gone for now — Synthea
+# closes every encounter (STOP IS NULL = 0) — and returns in step 3 when
+# messify.py injects it.
 
 id: gate0_inpatient_encounters_2023
 prompt: >-
@@ -20,30 +25,42 @@ prompt: >-
 # reference_sql and ground_truth are human-verified artifacts. The coding agent
 # may draft and execute them; a human signs off before they become canonical.
 ground_truth:
-  value: 37
+  # DRAFT CANDIDATE, executed but NOT signed off. 133 is what reference_sql
+  # returns against the seeded Synthea warehouse; 37 was the fixture-era number
+  # and died with the fixture.
+  value: 133
   tolerance: 0
 
-  # Signed off by the project owner on 2026-08-03 against the verification
-  # below. Until this read "verified" the harness scored the task but refused
-  # to count it as a pass (config/eval.yaml: require_verified_ground_truth), so
-  # an unreviewed number could not quietly turn the gate green.
+  # Returned to draft at Gate 1a step 2, exactly as the Gate 0 sign-off said it
+  # would be. `require_verified_ground_truth` (config/eval.yaml) means the
+  # harness still SCORES this task but refuses to count it as a pass, so an
+  # unreviewed number cannot quietly turn the gate green. That is the guard
+  # doing its job, not a regression.
   #
-  # This number is bound to the FIXTURE warehouse. When Synthea ingest replaces
-  # it at Gate 1 the value WILL change and must return to "draft" pending fresh
-  # sign-off — see the TODO in data/README.md.
-  status: verified
+  # Also note the committed cassettes are fixture-era: a replayed run still
+  # answers 37. Re-recording happens in step 7 together with the seed tasks, and
+  # is this gate's one real `make record`.
+  status: draft
 
   verification:
     # NB: `date:`, not `on:` — YAML 1.1 parses a bare `on` key as boolean True,
     # which silently loses the audit date.
+    # Superseded: signed off 2026-08-03 against the fixture warehouse, which no
+    # longer exists. Retained as a record of what was verified and when.
     - by: human
       date: 2026-08-03
       method: >-
-        Independent query against data/warehouse.duckdb, separate from the
-        agent run. Confirmed 37 inpatient encounters with START in 2023, of
-        which 6 have STOP IS NULL; the STOP IS NOT NULL variant returns 31.
-        year(START) resolving confirms START is a real TIMESTAMP column and the
-        nulls are genuine SQL NULLs rather than empty strings.
+        Against the DELETED CSV fixture warehouse. Confirmed 37 inpatient
+        encounters with START in 2023, of which 6 had STOP IS NULL.
+    - by: agent-draft
+      date: 2026-08-06
+      method: >-
+        Executed reference_sql against the seeded Synthea warehouse
+        (v4.0.0, seed 20260806, end_date 20260101, 2000 patients): 133 rows.
+        Ignoring ENCOUNTERCLASS returns 9867. STOP IS NULL is 0 because Synthea
+        closes every encounter; messify.py reintroduces open stays in step 3,
+        which will change this number again. AWAITING HUMAN SIGN-OFF (D17) —
+        and worth re-drafting after step 3 rather than signing twice.
 
 reference_sql: |
   SELECT count(*) AS n
