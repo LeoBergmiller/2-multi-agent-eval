@@ -19,6 +19,12 @@ from evals.runner import EvalReport
 
 PASS = "PASS"
 FAIL = "FAIL"
+#: A third verdict, and the reason it exists: after the warehouse changed under the
+#: committed cassettes, a mismatched metric no longer distinguished "the agent was
+#: wrong" from "this recording is older than the data it describes". Both are failures
+#: and both exit non-zero — but only one of them is a bug, and a transitional state
+#: that looks like a broken build gets ignored or, worse, "fixed" by pinning a number.
+STALE = "STALE"
 
 
 def format_line(report: EvalReport) -> str:
@@ -51,9 +57,26 @@ def render(report: EvalReport) -> str:
             f"repeated tool calls: {report.trajectory.repeated_tool_calls}"
         )
     lines.extend(f"  note: {n}" for n in report.notes)
+    if report.stale_reason:
+        lines.append(f"  stale: {report.stale_reason}")
     lines.append("")
-    lines.append(f"GATE 0: {PASS if report.passed else FAIL}")
+    lines.append(f"GATE 0: {verdict(report)}")
+    if report.stale_reason:
+        lines.append(
+            "  Cassettes are fixture-era and the ground truth is draft; both are "
+            "resolved by the re-record in Gate 1a step 7. Expected state, not a "
+            "broken build."
+        )
     return "\n".join(lines)
+
+
+def verdict(report: EvalReport) -> str:
+    """PASS, STALE, or FAIL. STALE and FAIL both exit non-zero."""
+    if report.passed:
+        return PASS
+    if report.stale_reason:
+        return STALE
+    return FAIL
 
 
 def ts_detail(report: EvalReport) -> str:

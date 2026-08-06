@@ -19,6 +19,7 @@ import yaml
 
 from analyst.artifacts import RunDirectory
 from analyst.contracts import Contract, load_eval_config
+from analyst.replay.manifest import staleness_note
 from evals.metrics.task_success import (
     GroundTruthStatus,
     TaskSuccessResult,
@@ -92,6 +93,10 @@ class EvalReport(Contract):
     price_table_checked: str
     git_sha: str
     notes: tuple[str, ...] = ()
+    #: Set when the committed cassettes were recorded against a different dataset than
+    #: the one committed now. A mismatched metric then means "the recording is old",
+    #: not "the agent was wrong" — different states, different verdicts.
+    stale_reason: str | None = None
 
 
 def score_run(run_id: str) -> EvalReport:
@@ -130,6 +135,10 @@ def score_run(run_id: str) -> EvalReport:
             f"{cfg.task_success_floor:.2f}."
         )
 
+    # Only a replayed run can be stale: a live or recording run reads the current
+    # warehouse by definition.
+    stale = staleness_note() if meta.cassette_mode == "replay" else None
+
     return EvalReport(
         run_id=run_id,
         task_id=meta.task_id,
@@ -142,6 +151,7 @@ def score_run(run_id: str) -> EvalReport:
         price_table_checked=meta.price_table_checked,
         git_sha=meta.git_sha,
         notes=tuple(notes),
+        stale_reason=stale,
     )
 
 

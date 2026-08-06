@@ -36,6 +36,7 @@ from analyst.replay import (
     ReplayingMCPClient,
     build_llm_client,
 )
+from analyst.replay.manifest import write_manifest
 from analyst.retrieval import corpus_version
 from analyst.telemetry import RunTracing, attrs
 
@@ -122,6 +123,19 @@ async def run_task(
             }
         )
     )
+
+    # A RECORD run is the only thing that can say what the cassettes describe, so it
+    # is the only thing that writes the manifest. Without this the next replay would
+    # still call them stale, having no way to know they had been refreshed.
+    if mode is CassetteMode.RECORD:
+        from analyst.replay.manifest import current_warehouse_version
+
+        path = write_manifest(
+            warehouse_version=current_warehouse_version(),
+            corpus_version=corpus_hash,
+            git_sha=meta.git_sha,
+        )
+        logger.info("wrote %s", path)
 
     if final_state.get("failed"):
         for event in final_state.get("validation_events", []):
