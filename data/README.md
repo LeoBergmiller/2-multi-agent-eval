@@ -1,68 +1,106 @@
 # Data
 
-## Gate 0: fixture warehouse (temporary)
+## Synthea warehouse
 
-`fixtures/` holds a small, hand-authored CSV warehouse — three tables, a few hundred rows —
-that exists only so `run_sql` has a real DuckDB to hit before Synthea ingest is built. It is
-committed on purpose: `make demo` must work from a clean clone with no network.
+`data/warehouse.duckdb`, built by `make data` from a seeded Synthea population. Both the
+generated CSVs and the DuckDB file are **gitignored** — they are derived, and large.
 
-Column names are verbatim from Synthea's exporter source — `CSVConstants.java`, the class
-that literally writes the header lines — verified 2026-08-03:
-<https://github.com/synthetichealth/synthea/blob/master/src/main/java/org/mitre/synthea/export/CSVConstants.java>
+**This does not break clone-and-run.** `make demo` replays from committed cassettes and
+needs no warehouse, no JDK, no network and no API key. Building the warehouse is only
+required to run live or to re-record.
 
-**Use the source, not the wiki.** The [CSV data dictionary wiki page][wiki] renders columns in
-TitleCase (`Id, BirthDate, …`); real Synthea output is `Id` followed by UPPERCASE
-(`Id,BIRTHDATE,…`, `Id,START,STOP,…`). DuckDB identifiers are case-insensitive so SQL works
-either way, but the committed headers match real output so the Gate 1 swap is byte-clean.
+### Reproducibility
 
-[wiki]: https://github.com/synthetichealth/synthea/wiki/CSV-File-Data-Dictionary
+Everything that determines the population is committed in `data/synthea_spec.py`:
 
-That is the whole point of the fixture's design. **Gate 1 must be a data swap, not a rewrite** —
-if the fixture invented its own schema, replacing it would also mean rewriting the SQL Analyst
-prompt, the `describe_table` output shape, and the eval task's `reference_sql`.
+| | |
+|---|---|
+| Synthea | `v4.0.0`, pinned by **sha256** as well as tag |
+| Population | 2000 (yields 2286 patients — Synthea also emits the deceased) |
+| Seed / clinician seed | `20260806` |
+| End date / reference date | `20260101` |
+| State | Massachusetts |
 
-Tables (Gate 0 subset of architecture.md §2's twelve):
+Two pins are load-bearing in ways that are not obvious:
 
-| Table | Rows | Notes |
-|---|---|---|
-| `patients` | 50 | |
-| `encounters` | 200 | Real `ENCOUNTERCLASS` values; **6 rows have a null `STOP`** |
-| `organizations` | 5 | |
+- **The jar checksum, not the tag.** Synthea's only rolling release is
+  `master-branch-latest`, and even `v4.0.0` reports `immutable: false` — GitHub permits
+  its assets to be replaced in place. A jar that changed underneath would not error; it
+  would generate a different population from the same seed while `make data` still
+  reported success. `make synthea-jar` verifies the digest and refuses a mismatch.
+- **`-e` (end date), not just `-r`.** Synthea simulates up to *today* by default. A
+  first attempt pinned only `-r` and produced encounters timestamped at the moment of
+  the run — the CSVs looked normal, the ingest succeeded, and regenerating tomorrow
+  would have produced different counts from the same seed. `-e` bounds the simulation,
+  and `_assert_simulation_ended` re-checks the *result* after every ingest rather than
+  trusting the flag.
 
-Encounter composition, chosen so the Gate 0 task has a checkable answer with live traps:
+Verified byte-for-byte: two consecutive runs produce identical CSV checksums.
 
-| `ENCOUNTERCLASS` | Year | Rows | |
-|---|---|---|---|
-| `inpatient` | 2023 | 37 | **the answer** (6 of them still admitted) |
-| `inpatient` | 2022 | 18 | year distractor |
-| `ambulatory` | 2023 | 55 | |
-| `wellness` | 2023 | 44 | the classic "admission" trap class |
-| `emergency` | 2023 | 28 | |
-| `urgentcare` | 2023 | 18 | |
+### Tables and types
 
-So "how many inpatient encounters started in 2023?" is **37**. A query that drops
-still-admitted patients returns 31; one that ignores `ENCOUNTERCLASS` returns 182.
+Nine tables: `patients`, `organizations`, `providers`, `payers`, `encounters`,
+`conditions`, `procedures`, `claims`, `payer_transitions`. Synthea exports more; loading
+only these keeps `describe_schema` small and the allow-list tight.
 
-The null `STOP` values represent still-admitted patients. They are deliberate: a query that
-assumes every encounter has been discharged (a stray `STOP IS NOT NULL`, or a join that drops
-open encounters) returns a wrong answer. They make the Gate 0 eval task non-trivial without
-making its *definition* ambiguous — which matters because the metrics dictionary does not exist
-until Gate 1, so Gate 0 ground truth must be determined by reference SQL alone
-(architecture.md §2, task admissibility rule).
+**Column types are declared explicitly, never sniffed.** DuckDB's sniffer infers `STOP`
+as VARCHAR because empty strings appear there, and every downstream date comparison then
+becomes a silent string comparison. Types come from Synthea's `CSVConstants.java` and
+`CSVExporter.java` at the pinned tag — the wiki renders columns TitleCase while the
+exporter writes UPPERCASE, and DuckDB's case-insensitivity means the wrong one would
+never fail, only be wrong. `conditions` uses DATE while `encounters`, `procedures` and
+`claims` use TIMESTAMP; each was checked against the writer rather than assumed.
 
-### TODO — DELETE AT GATE 1
+The ingest also asserts each CSV's header matches the spec exactly, so a Synthea version
+that inserted a column fails loudly instead of loading plausible values into shifted
+columns.
 
-When Synthea ingest lands (`make data` generating from a fixed seed) and `messify.py` injects
-the real data-quality pathologies:
+### Population shape (seed 20260806)
 
-1. Delete `data/fixtures/` entirely.
-2. Delete `data/load_fixtures.py`.
-3. Point `make data` at the Synthea ingest path.
-4. Re-verify the Gate 0 eval task's `ground_truth` against the real warehouse — the number
-   **will** change, and it needs human sign-off again (architecture.md §13, D17).
-5. Delete this section.
+| | |
+|---|---|
+| patients | 2 286 |
+| encounters | 137 287 |
+| conditions / procedures / claims | 80 278 / 296 954 / 244 648 |
+| encounter classes | ambulatory 76 499 · wellness 28 006 · outpatient 17 431 · urgentcare 5 525 · emergency 4 952 · **inpatient 3 206** · home 685 · virtual 340 · snf 337 · hospice 306 |
+| encounter START range | 1916-05-03 .. 2025-12-31 |
+| still-admitted (`STOP IS NULL`) | **0** |
 
-The fixture is scaffolding. It should not survive Gate 1.
+That last row matters: **Synthea closes every encounter**, so the still-admitted
+pathology the Gate 0 fixture carried by hand does not exist in real Synthea output. It
+returns in step 3, when `messify.py` injects it deliberately.
+
+### Expected state: `make demo` reports STALE
+
+Between step 2 and step 7, `make demo` exits non-zero with:
+
+```
+GATE 0: STALE
+  Cassettes are fixture-era and the ground truth is draft; both are resolved by
+  the re-record in Gate 1a step 7. Expected state, not a broken build.
+```
+
+**This is deliberate.** Two independent things went stale at once: the ground truth
+(fixture → Synthea) and the committed cassettes (recorded against the fixture). Pinning
+the old number to keep the demo green would have committed a known-wrong value showing
+`task_success=1.00` — exactly the silent-wrong this project exists to catch.
+
+`STALE` is a distinct verdict from `FAIL` because they are distinct states: a mismatched
+metric against *current* data means the agent was wrong, while a mismatch against
+*superseded* recordings means the recording is old. Both exit non-zero — staleness
+explains a failure, it never excuses one — but only one of them is a bug. The check
+compares `data/warehouse_version.txt` (committed) against `cassettes/manifest.json`
+(written by a RECORD run, committed), so it works on a clean clone with no warehouse,
+and it outlives this gate: any future re-seed or re-pin of Synthea invalidates the
+recordings the same way.
+
+### The Gate 0 fixture is gone
+
+`data/fixtures/` and `data/load_fixtures.py` were deleted here. The Gate 0 task's ground
+truth of 37 was bound to those bytes, so per the carried rule it has returned to
+`status: draft` with a drafted Synthea candidate of 133 awaiting human sign-off (D17).
+The committed cassettes are still fixture-era and replay 37; re-recording happens in
+step 7 and is this gate's one real `make record`.
 
 ## `metrics_dictionary/` — the RAG corpus (committed)
 
