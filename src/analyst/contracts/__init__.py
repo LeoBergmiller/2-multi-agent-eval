@@ -21,6 +21,7 @@ from analyst.contracts.config import (
 from analyst.contracts.errors import Boundary, ContextTransferError, ValidationEvent
 from analyst.contracts.refs import ArtifactFormat, ColumnSchema, Evidence, ResultRef
 from analyst.contracts.results import AgentResult, FinalAnswer, ResultStatus
+from analyst.contracts.retrieval import RetrievalResult, RetrievedChunk
 from analyst.contracts.task import (
     GATE0_ROLES,
     AgentRole,
@@ -53,6 +54,8 @@ __all__ = [
     "Plan",
     "ResultRef",
     "ResultStatus",
+    "RetrievalResult",
+    "RetrievedChunk",
     "SubTask",
     "TaskSpec",
     "ValidationEvent",

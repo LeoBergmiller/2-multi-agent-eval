@@ -22,6 +22,12 @@ FIXTURES = REPO_ROOT / "data" / "fixtures"
 
 
 @pytest.fixture
+def committed_corpus() -> Path:
+    """The real metrics-dictionary corpus (architecture.md §1.5, committed)."""
+    return REPO_ROOT / "data" / "metrics_dictionary"
+
+
+@pytest.fixture
 def runs_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Redirect `runs/` into tmp so tests never write real run directories."""
     root = tmp_path / "runs"
