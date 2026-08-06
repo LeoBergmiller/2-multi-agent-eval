@@ -37,7 +37,31 @@ RETRY_COUNT: Final = "retry.count"
 VALIDATION_PASSED: Final = "validation.passed"
 CASSETTE_MODE: Final = "cassette.mode"
 
-# Gate 1 adds: retrieval.* (§5). Absent here rather than stubbed.
+# -- Retrieval (§5) ----------------------------------------------------------
+# Emitted on every `search_metric_definitions` tool call. `RETRIEVAL_BACKEND` is the
+# one that is easy to omit and expensive to lack: without it a cassette-replayed
+# retrieval and a live one are indistinguishable in the eval record, and a nightly
+# live arm could be scored as if it had been hermetic.
+RETRIEVAL_STRATEGY: Final = "retrieval.strategy"
+RETRIEVAL_K: Final = "retrieval.k"
+RETRIEVAL_LATENCY_MS: Final = "retrieval.latency_ms"
+RETRIEVAL_SCORES: Final = "retrieval.scores"
+RETRIEVAL_CORPUS_VERSION: Final = "retrieval.corpus_version"
+RETRIEVAL_BACKEND: Final = "retrieval.backend"
+RETRIEVAL_DOC_IDS: Final = "retrieval.doc_ids"
+
+#: Attributes that must carry a real value on any span that performs a retrieval.
+RETRIEVAL_REQUIRED: Final[frozenset[str]] = frozenset(
+    {
+        RETRIEVAL_STRATEGY,
+        RETRIEVAL_K,
+        RETRIEVAL_LATENCY_MS,
+        RETRIEVAL_SCORES,
+        RETRIEVAL_CORPUS_VERSION,
+        RETRIEVAL_BACKEND,
+        RETRIEVAL_DOC_IDS,
+    }
+)
 
 #: Attributes that must carry a real value somewhere in a Gate 0 run. Asserted
 #: by the test suite so a regression that silently drops one is caught.

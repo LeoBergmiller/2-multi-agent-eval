@@ -5,36 +5,50 @@ ports. §1/§1.5 name the library "FastMCP"; in mcp 2.x that class is
 `MCPServer` (`mcp.server.mcpserver`). The decorator shape §4 shows is
 unchanged, so the tool signature is as specified. See D22.
 
-Gate 0 registers one tool. The resources and prompts in §4 (`schema://warehouse`,
-`docs://metrics/{doc_id}`, `analyst/plan`, `analyst/sql_style`) land at Gate 1
-alongside the other four tools — absent here rather than stubbed.
+Gate 1a registers two tools: `run_sql` and `search_metric_definitions`. The remaining
+three tools, the resources and the prompts in §4 land later in Gate 1 — absent here
+rather than stubbed.
 
 Run standalone:
     python -m analyst.mcp.server --warehouse data/warehouse.duckdb \\
-        --results-dir runs/<run_id>/results
+        --results-dir runs/<run_id>/results [--rag-config config/rag_eval.yaml]
 """
 
 from __future__ import annotations
 
 import argparse
 import asyncio
+import logging
 from pathlib import Path
 
 from mcp.server.mcpserver import MCPServer
 
 from analyst.artifacts import ResultStore
+from analyst.mcp.tools.retrieval import DefinitionSearcher, SearchResult
 from analyst.mcp.tools.sql import QueryResult, SqlRunner
 
 SERVER_NAME = "analyst-warehouse"
 
+logger = logging.getLogger(__name__)
 
-def build_server(warehouse: Path, results_dir: Path) -> MCPServer:
-    """Construct the server. Separated from `main` so tests can bind in-process."""
+
+def build_server(
+    warehouse: Path, results_dir: Path, rag_config: Path | None = None
+) -> MCPServer:
+    """Construct the server. Separated from `main` so tests can bind in-process.
+
+    `rag_config=None` registers `run_sql` only. That is the REPLAY shape: a replayed run
+    resolves every tool call from a cassette at the client seam and never spawns this
+    server, and CI has neither the `[rag]` extra nor an index. Requiring retrieval to
+    build a server would make the hermetic path depend on the optional one.
+    """
     server = MCPServer(
         name=SERVER_NAME,
         instructions=(
-            "Read-only access to a healthcare operations warehouse. "
-            "SELECT queries only; results are returned as references, not frames."
+            "Read-only access to a healthcare operations warehouse and the metrics "
+            "dictionary. SELECT queries only; results are returned as references, not "
+            "frames. Metric definitions are retrieved as passages to be read, not "
+            "summarised for you."
         ),
     )
     runner = SqlRunner(warehouse, ResultStore(results_dir))
@@ -54,16 +68,57 @@ def build_server(warehouse: Path, results_dir: Path) -> MCPServer:
         """
         return runner.run(query, max_rows=max_rows)
 
+    if rag_config is not None:
+        _register_retrieval(server, rag_config)
+
     return server
+
+
+def _register_retrieval(server: MCPServer, rag_config: Path) -> None:
+    """Register `search_metric_definitions` and warm it once, at startup.
+
+    `warmup()` here rather than on first call is the whole point of §5's split: the
+    model load is ~seconds and charging it to whichever query happens to run first
+    would make every recorded latency a lie about the one that paid for it.
+    """
+    from analyst.retrieval.rag_eval_backend import RagEvalRetriever
+
+    searcher = DefinitionSearcher(RagEvalRetriever(rag_config))
+    searcher.warmup()
+    logger.info("retrieval warm; registering search_metric_definitions")
+
+    @server.tool(name="search_metric_definitions")
+    def search_metric_definitions(query: str, k: int = 5) -> SearchResult:
+        """Look up how an operational metric is defined in the metrics dictionary.
+
+        Use this BEFORE writing SQL for any metric whose definition could reasonably
+        be read more than one way — readmission windows, length of stay, what counts
+        as an admission, payer-mix denominators. The dictionary is authoritative; a
+        plausible reading that contradicts it is wrong.
+
+        Returns scored passages with their `doc_id`, to be read and cited. It does not
+        summarise or interpret them.
+
+        Args:
+            query: What you need defined, in natural language.
+            k: How many passages to return (1-20).
+        """
+        return searcher.search(query, k=k)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Analyst MCP server (stdio)")
     parser.add_argument("--warehouse", type=Path, required=True)
     parser.add_argument("--results-dir", type=Path, required=True)
+    parser.add_argument(
+        "--rag-config",
+        type=Path,
+        default=None,
+        help="rag-eval config; omit to serve run_sql only (no [rag] extra needed)",
+    )
     args = parser.parse_args()
 
-    server = build_server(args.warehouse, args.results_dir)
+    server = build_server(args.warehouse, args.results_dir, args.rag_config)
     asyncio.run(server.run_stdio_async())
 
 

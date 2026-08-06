@@ -74,18 +74,27 @@ def _to_result(name: str, raw: Any) -> ToolCallResult:
 class StdioMCPClient:
     """Speaks MCP to a subprocess over stdio (the §4 transport)."""
 
-    def __init__(self, warehouse: Path, results_dir: Path) -> None:
-        self._params = StdioServerParameters(
-            command=sys.executable,
-            args=[
-                "-m",
-                "analyst.mcp.server",
-                "--warehouse",
-                str(warehouse),
-                "--results-dir",
-                str(results_dir),
-            ],
-        )
+    def __init__(
+        self,
+        warehouse: Path,
+        results_dir: Path,
+        rag_config: Path | None = None,
+    ) -> None:
+        args = [
+            "-m",
+            "analyst.mcp.server",
+            "--warehouse",
+            str(warehouse),
+            "--results-dir",
+            str(results_dir),
+        ]
+        # Omitted by default: without it the server registers `run_sql` only and needs
+        # neither the [rag] extra nor a built index. Retrieval is opt-in per spawn, so
+        # a task that never looks up a definition does not pay the model-load cost
+        # (~5s per subprocess — see D25).
+        if rag_config is not None:
+            args += ["--rag-config", str(rag_config)]
+        self._params = StdioServerParameters(command=sys.executable, args=args)
         self._stack = AsyncExitStack()
         self._session: ClientSession | None = None
 
