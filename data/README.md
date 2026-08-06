@@ -64,6 +64,38 @@ the real data-quality pathologies:
 
 The fixture is scaffolding. It should not survive Gate 1.
 
+## `metrics_dictionary/` — the RAG corpus (committed)
+
+Authored Markdown, read by `make index` through Project 1's `local` corpus source and
+hashed into `corpus_version`, which is part of the retrieval cassette key
+(architecture.md §6.2). Editing a definition therefore **invalidates stale cassettes
+instead of silently replaying a retrieval the edit was meant to correct**.
+
+`doc_id` is the filename stem, so `readmission_30day.md` is cited as
+`docs://metrics/readmission_30day`. Stems must be unique across subdirectories.
+
+**Nothing but corpus documents belongs in that directory.** Every `.md` and `.txt`
+under it is ingested as a document — which is why this section lives here rather than
+in a `metrics_dictionary/README.md` that would index itself as a metric definition.
+
+### Status: provisional (Gate 1a step 1)
+
+Three entries — `admission`, `length_of_stay`, `readmission_30day` — exist so the
+Project 1 spike has something real to retrieve over. They are the first of the
+load-bearing set, not the finished corpus.
+
+**Step 4 authors the real dictionary:** ~10 load-bearing entries (one per seed-task
+definition, plus one per `messify.py` pathology) and ~15–20 near-miss distractors. The
+distractors are the point — with three documents retrieval is trivially perfect and
+RAGAS measures nothing.
+
+Cassettes recorded against this provisional corpus are **disposable by design**. When
+step 4 lands, `corpus_version` changes and invalidates every one of them. That is the
+mechanism working. Re-record after step 4; do not carry them forward.
+
+Current `corpus_version`: `c24dc219e69d4e63` (3 documents, 3 chunks).
+
 ## Gitignored paths
 
 `synthea/`, `warehouse.duckdb`, and `index/` are generated, never committed.
+`metrics_dictionary/` is **not** generated — it is authored source and is committed.

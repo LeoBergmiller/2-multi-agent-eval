@@ -1,0 +1,74 @@
+# Project 1 (`rag-eval`) configuration, owned by THIS repo.
+#
+# rag-eval resolves its default config relative to its own package source, which only
+# exists in a checkout or editable install. Installed as a dependency it has no default,
+# and since v0.2.0 it says so with an actionable error instead of an obscure open failure.
+# So this file is passed explicitly: `load_config(Path("config/rag_eval.yaml"))`.
+#
+# Only the retrieval-relevant blocks are load-bearing here. `generation` and `evaluation`
+# are required by rag-eval's schema but never exercised — this repo uses the in-process
+# retrieval path only (architecture.md §5), never the FastAPI /query endpoint, so no
+# generator or judge is ever constructed and no key is ever read.
+
+corpus:
+  # The `local` source added in rag-eval v0.2.0 (its D13): authored Markdown read from
+  # disk, doc_id = filename stem. No fetch, no network. Because the source is `local`,
+  # the arXiv/PMC fetch fields (categories, max_papers, fulltext, query) are not required
+  # and are deliberately absent rather than present as meaningless placeholders.
+  source: local
+  raw_dir: data/metrics_dictionary   # COMMITTED — this is the corpus (architecture.md §1.5)
+  index_dir: data/index              # gitignored, built by `make index`
+
+chunking:
+  # Byte-identical to rag-eval's own config. These are controlled variables that feed
+  # rag-eval's `config_fingerprint`; there is no reason to diverge and every reason not to.
+  strategy: recursive
+  units: tokens
+  chunk_size: 512
+  chunk_overlap: 64
+  store_parent: true
+
+embedding:
+  model: BAAI/bge-base-en-v1.5
+  device: cpu
+  # bge applies this prefix to QUERIES ONLY; passages are embedded bare. Getting it
+  # backwards silently tanks recall, which is exactly the silent-wrong shape this project
+  # is built to catch — rag-eval unit-tests the asymmetry.
+  query_prefix: "Represent this sentence for searching relevant passages: "
+
+retrieval:
+  # `dense` for the spike. The metrics dictionary is short, definition-laden prose where
+  # near-miss distractors differ by a few words ("30-day" vs "90-day", "midnights" vs
+  # "calendar days"), so `hybrid` is the likely end state — but that is a measurement to
+  # make against the real corpus in step 4, not a guess to bake in now.
+  strategy: dense
+  index_type: flat        # exact IndexFlatIP — no ANN recall loss
+  top_k: 5
+  candidate_k: 50
+  reranker: BAAI/bge-reranker-base
+  fusion: rrf
+  rrf_k: 60
+
+# --- Required by rag-eval's schema; never exercised from this repo. ---
+# The in-process retrieval path constructs no generator and no judge. If anything here
+# ever starts mattering, something has wired up the /query endpoint by mistake.
+generation:
+  provider: anthropic
+  model: claude-sonnet-4-6
+  temperature: 0
+  max_tokens: 512
+
+evaluation:
+  judge_provider: openai
+  judge_model: gpt-4o
+  judge_temperature: 0
+  ragas_metrics: [faithfulness, answer_relevancy, context_precision, context_recall]
+  retrieval_metrics: [recall_at_k, precision_at_k, mrr, ndcg_at_k]
+  abstention: true
+  bootstrap_resamples: 1000
+  eval_set: data/unused/eval_set.jsonl
+  dev_test_split: [0.4, 0.6]
+  gate:
+    floors: {}
+    tolerance: {}
+    operational_ceilings: {}
