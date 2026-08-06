@@ -1,0 +1,30 @@
+{
+  "seed": 20260806,
+  "injections": [
+    {
+      "name": "duplicate_encounters",
+      "count": 220,
+      "description": "inpatient encounter rows double-posted; count(*) overcounts"
+    },
+    {
+      "name": "open_stays",
+      "count": 140,
+      "description": "inpatient encounters with NULL STOP (still admitted)"
+    },
+    {
+      "name": "reversed_stays",
+      "count": 35,
+      "description": "encounters with STOP < START (invalid, excluded not clamped)"
+    },
+    {
+      "name": "payer_casing",
+      "count": 3,
+      "description": "payer names with uppercase + trailing whitespace; naive GROUP BY splits them"
+    },
+    {
+      "name": "merged_organization",
+      "count": 1,
+      "description": "organization Hospital 0 changed ID mid-2025; grouping by ID splits it"
+    }
+  ]
+}
