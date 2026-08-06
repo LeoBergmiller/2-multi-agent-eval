@@ -37,14 +37,17 @@ Corollary: **the Gate 0 ground truth of 37 dies with the fixture.** Per the carr
 
 The only part of 1a with a dependency outside your control: a tagged package, a built index, a ~120s HF warmup. Prove it works before the corpus exists.
 
-- Tag Project 1, add the git-pinned optional extra to `pyproject.toml`, `uv sync --extra rag`
+- Fix and tag Project 1 (see D24 — the extras split and the `local` ingest source are prerequisites, so the tag comes **last**, not first), add the git-pinned optional extra to `pyproject.toml`, `uv sync --extra rag`
 - Build a throwaway 3-document index
-- Implement `RetrievalBackend` protocol + `RagEvalRetriever` using the **in-process path only** (`load_config → load_resources → build_retriever(strategy) → retriever.retrieve(query, k)`). Never the FastAPI `/query` endpoint — it runs generation, which costs money and returns an answer when the agent wants passages.
-- `chunk.parent_id → doc_id`; pass `chunk_id` and `score` through unchanged
-- `warmup()` called once at MCP server startup, never per call
-- Record one cassette through the MCP seam; prove replay works with the index deleted
+- Implement `RetrievalBackend` protocol + `RagEvalRetriever` using the **in-process path only** (`load_config(explicit_path) → load_resources(cfg) → build_retriever(strategy, cfg, resources) → retriever.retrieve(query, k)`, which returns a `RetrievalResult` whose `.chunks` is the list). Never the FastAPI `/query` endpoint — it runs generation, which costs money and returns an answer when the agent wants passages.
+- `chunk.parent_id → doc_id`; pass `chunk_id` and `score` through unchanged. `parent_id` is typed `str | None` — a `None` reaching `doc_id` must **raise at the adapter boundary**, never default. `must_cite` is keyed on `doc_id`, so a `"None"` string would be a silent-wrong citation.
+- `warmup()` called once at MCP server startup, never per call. It must build the retriever too, not just load resources — `rerank` loads its cross-encoder at `build_retriever` time.
+- **Register `search_metric_definitions` as an MCP tool here.** Pulled forward from step 5: recording through the MCP seam is impossible without the tool that crosses it. This is the one piece of step 5 that step 1 owns.
+- Record one cassette through the MCP seam; prove replay works with the index deleted. **These cassettes are disposable by design** — `corpus_version` hashes the corpus into the retrieval cassette key (§6.2), so the real dictionary landing in step 4 invalidates every one of them. That is the mechanism working, not a defect. Re-record after step 4.
 
-**Stop and report if:** the P1 API differs from the above, retrieval is slower than ~2s warm, or the extra can't install without the local path. Do not work around it silently — the whole Gate 1 shape depends on this tool being cheap and reliable.
+**Report the three Phase D numbers before proceeding:** cold `warmup()` (first run, model download), **warm `warmup()`**, and p50 `retrieve` latency. Warm warmup is the number that matters, because `StdioMCPClient` spawns a fresh server subprocess per run — warmup is paid once per *task*, not once per process. Whether a sweep reuses one server subprocess is an architecture decision to be made from that measurement and recorded in `decisions.md`; the server is stateless (read-only DuckDB, read-only index) and the cassettes sit at the client seam, so hermeticity does not constrain the answer.
+
+**Stop and report if:** the P1 API differs from the above, or the extra can't install without the local path. Do not work around it silently — the whole Gate 1 shape depends on this tool being cheap and reliable.
 
 ### Step 2 — Synthea ingest
 
@@ -67,6 +70,14 @@ Deterministic, seeded, committed, runs after ingest. Inject:
 - one organization that changed its ID mid-year
 
 Each pathology becomes both a metrics-dictionary rule and a candidate trap task. Emit a summary of what it injected — the counts are needed for reference SQL.
+
+### Step 3.5 — Draft the 7 task intents (prose only)
+
+One paragraph per task: the question, the trap, and which tools it should force. **No SQL, no numbers, no ground truth.**
+
+This exists because step 4 says to author the dictionary task-intent-first while step 7 authors the tasks — you cannot derive a dictionary from intent that does not exist yet. Drafting intent here resolves that without violating §1, which governs *ground truth* (needs the warehouse) rather than intent (does not).
+
+The intents are provisional. Step 7 may change a question once the real row counts are known; what step 4 needs is the *shape* of the ambiguity, not the final wording.
 
 ### Step 4 — Metrics dictionary
 
@@ -110,6 +121,8 @@ Planner must now emit plans with genuine fan-out: a `Plan` DAG where the docs lo
 
 **No failure-injection task in 1a** — the machinery is 1b. That task gets authored there.
 
+**Retiring the Gate 0 task has blast radius — sequence it here, don't discover it at the checklist.** `gate0_inpatient_encounters_2023.yaml` is the `Makefile`'s default `TASK`, and `runs/demo-gate0/` plus its committed cassettes are keyed to it. Retiring or re-verifying it therefore means, in order: pick the new default `TASK` from the seed set, re-record its cassettes, commit the new run at `runs/demo-gate1a/`, and retire `runs/demo-gate0/`. **That re-record is this gate's one real `make record`** — it satisfies the standing rule rather than being an extra chore, so do not also schedule a separate live run.
+
 **Ground-truth protocol (D17).** For each: draft `reference_sql`, execute it, and present the human with the number, the row count, and enough of the row set to check. `status: draft` until explicit sign-off. `require_verified_ground_truth: true` means the harness scores but refuses to pass on an unverified number. Record `by`, `on`, and `method` in the task YAML.
 
 **Design the eventual set by metric coverage, not by count.** "25 tasks" is arbitrary. The requirement is that no metric is degenerate — `recovery_rate` over three tasks is noise. Target: every metric has ≥5 tasks exercising it non-trivially. The count falls out (likely 22–28) and is defensible in a way a round number isn't. The other ~17 get authored in 1c as variations, once the system runs.
@@ -119,6 +132,7 @@ Planner must now emit plans with genuine fan-out: a `Plan` DAG where the docs lo
 ## 3. Carried from Gate 0 — do not relearn these
 
 - **Silent-failure shape.** Every Gate 0 defect and near-miss was a wrong thing that couldn't fail loudly: DuckDB's case-insensitivity, Pydantic's silent extra-drop, OTel's warn-and-continue, a dump/load asymmetry never exercised in one process. When adding a component, ask what its silent-wrong mode is and write the test that would catch it.
+- **Replay covers the cassetted result, not the artifact behind the ref.** A replayed run's `results/` is empty by design: the recorded artifact is the `ResultRef`, not the frame it points at, and recording the frame would be a third seam. So any new path that *resolves* a ref to its file is invisible to the hermetic gate — it passes CI and fails only live. **Every new ref-consuming path needs a RECORD-mode test.** First one due with seed task 3 (`run_sql → run_python`), which is the first consumer of the frame behind a ref.
 - **No global state.** The tracer is threaded through `RunContext`. Nothing new sets a process-global.
 - **`extra="forbid"` on every contract.** It caught a partial `TaskFile` model at Gate 0.
 - **One real `make record` per gate.** The stubbed RECORD path can't detect a vendor wire-format change.
@@ -137,17 +151,21 @@ Quant Analyst · Validator node · replan edge · failure injection · the seven
 
 ## 5. Exit checklist
 
-- [ ] P1 retrieval works in-process, cassette recorded, replay works with the index deleted
+- [ ] P1 tagged with the extras split + `local` source (D24); `uv sync --extra rag` resolves; CI still green *without* the extra
+- [ ] P1 retrieval works in-process; the three Phase D numbers measured and the subprocess-reuse decision recorded
+- [ ] Retrieval cassette **re-recorded after step 4** — the step-1 cassettes died with the throwaway corpus (`corpus_version`); replay works with the index deleted
 - [ ] `make data` regenerates the Synthea warehouse deterministically from a committed seed
 - [ ] `messify.py` deterministic, its injected counts reported
-- [ ] `data/fixtures/` deleted; Gate 0 task re-verified against Synthea or retired
+- [ ] `data/fixtures/` deleted; Gate 0 task re-verified against Synthea or retired, with the `Makefile` default `TASK` repointed and `runs/demo-gate0/` retired
+- [ ] 7 task intents drafted in prose (step 3.5) before the dictionary was authored
 - [ ] Metrics dictionary committed: ~10 load-bearing + ~15–20 distractors, `corpus_version` in the cassette key
 - [ ] All 5 tools, 2 resources, 2 prompts live; `LocalDockerSandbox` hardened as specified
 - [ ] Docs Analyst node; Planner emits genuine fan-out
 - [ ] 7 seed tasks, all `status: verified` with recorded method
 - [ ] **Exit criterion met:** a question requiring both SQL and a docs lookup answers correctly, and skipping the lookup demonstrably produces a wrong number
 - [ ] `make lint` green, tests green, `make demo` runs keyless from cassettes
-- [ ] One committed run at `runs/demo-gate1a/`
+- [ ] One committed run at `runs/demo-gate1a/`, produced by this gate's one real `make record`
+- [ ] A RECORD-mode test covering `ResultRef` resolution (seed task 3)
 - [ ] `docs/gate-1a.md` retrospective; `CLAUDE.md` gate line updated to 1b
 
 **Stop at the checklist. No 1b work.**

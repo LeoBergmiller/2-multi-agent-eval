@@ -206,6 +206,28 @@ Four decisions taken while building Gate 0, grouped because they share one cause
 - **Choice:** `src/analyst/{contracts,llm,mcp,replay,telemetry,artifacts,graph}` plus a separate top-level `evals/`. §1.5 updated to match.
 - **Rationale:** five bare top-level names is a broad claim on the namespace. `evals/` stays outside `analyst/` deliberately: **the harness and the system under test should not share a namespace**, which is the whole framing of this project.
 
+### D24 — Project 1 dependency split, to make `search_metric_definitions` installable at all
+
+Taken at the start of Gate 1a, before any code here was written against Project 1. The Gate 1a spike's own instruction was to stop and report if the P1 API differed from the assumed one. It did, and two of the differences were blocking.
+
+**What blocked.** (a) `rag-eval` declared `anthropic==0.109.1` as a hard runtime dependency against this project's `anthropic>=0.120`. Verified with a real resolution, not inferred: *"your project's requirements are unsatisfiable."* The extra could not install in any form. Restricting ourselves to the `dense` strategy would not have helped — `rag_eval.retrieval.registry` imported `hyde` at module scope, and `hyde` pulls the whole LangChain generation stack, so the `anthropic` pin was unavoidable on every import path. (b) P1 had no way to ingest an *authored* corpus: `_load_source_documents` dispatched to the arXiv downloader or the PMC downloader and nothing else, so the metrics dictionary — Markdown on disk — had no path into an index.
+
+**Options.**
+1. Widen P1's `anthropic` pin to a range. Unblocks in ten minutes; still installs 1.5 GB into this venv and couples the two projects' LLM-client versions permanently.
+2. Split P1's dependencies into a framework-free retrieval base install plus a `[full]` extra, and add a `local` corpus source.
+3. Reimplement retrieval here against P1's committed index format. Kills the integration claim.
+4. Publish a separate `rag-eval-core` distribution. Splits one codebase across two release cadences for no gain.
+
+**Choice: 2.** Recorded in P1 as its D13. Base install = the framework-free retrieval + indexing core and the ingest pipeline; generation, RAGAS, both judges, the gate, the arXiv/PMC fetchers, the CLI and the API/UI move to `[full]`. `hyde`'s import and the per-source fetchers' imports become branch-local. A `local` source reads authored Markdown/text keyed by filename stem, and `CorpusConfig`'s fetch parameters become per-source-required, so this project's config carries no meaningless arXiv fields.
+
+**Rationale.** Option 1 buys speed and pays with permanent coupling — and leaves the actual defect in place. P1's own D7 already committed to a framework-free retrieval core, but that was true only of its *source tree*: the *install* forced LangChain, RAGAS, OpenAI, FastAPI and Streamlit on every dependent. That is a packaging defect independent of who consumes it, so fixing it improves P1 on its own terms rather than bending it to this project's convenience. The `local` source had to be added under any option, which is what makes option 1's saving illusory — P1 was being opened and re-tagged either way.
+
+**Verified, not assumed.** A clean venv with only the base install has no `anthropic`, `ragas`, `openai`, `fastapi`, `streamlit`, `arxiv` or `pypdf` importable, and still builds a 3-document local index and retrieves over it. P1's full suite passes and its regression gate passes with an **identical `config_fingerprint` on both sides** — no field touched here feeds the fingerprint, so P1's committed arXiv and medical baselines and its cross-domain claim are untouched.
+
+**Pushback: *"Why did you modify a finished project to make a new one work?"*** → Two separate answers, and neither is "convenience." The `local` ingest adapter was required regardless — a corpus that is authored rather than fetched had no path into the index, and that is a gap in P1's own "add a config + an ingest adapter" claim, which it now demonstrates a second time on a source that is not a downloader. The extras split fixes a real packaging defect: a retrieval library that force-installs a web framework and two LLM SDKs is wrong on its own terms, and P1's D7 already said so in prose while its `pyproject.toml` said otherwise. The reuse boundary is now clean and explicit — this project depends on the retrieval core and nothing else — which is a stronger composition story than a version-pin workaround would have been.
+
+**Cost, stated plainly.** P1's CI, Dockerfile and README quickstart move to `[full,dev]`/`[full]`. A `full` install behaves exactly as before. This project's `[rag]` extra still pulls torch and faiss (~1.2 GB) — unavoidable for real dense retrieval — but CI never installs the extra, so the blocking gate is unaffected.
+
 ---
 
 ### D13 — MVP cut line
