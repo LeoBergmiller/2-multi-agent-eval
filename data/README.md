@@ -116,22 +116,25 @@ instead of silently replaying a retrieval the edit was meant to correct**.
 under it is ingested as a document — which is why this section lives here rather than
 in a `metrics_dictionary/README.md` that would index itself as a metric definition.
 
-### Status: provisional (Gate 1a step 1)
+### Status: load-bearing set complete, distractors pending (Gate 1a step 4)
 
-Three entries — `admission`, `length_of_stay`, `readmission_30day` — exist so the
-Project 1 spike has something real to retrieve over. They are the first of the
-load-bearing set, not the finished corpus.
+Ten entries, derived from the seven seed-task intents in `docs/task-intents.md` rather
+than authored exhaustively — five metric definitions (`admission`, `length_of_stay`,
+`readmission_30day`, `payer_mix_denominator`, `attributed_organization`) and one per
+`messify.py` pathology (`encounter_deduplication`, `open_stays`, `reversed_stays`,
+`payer_name_normalisation`, `organization_identity`). Ten is where task intent landed,
+not a target that was aimed for.
 
-**Step 4 authors the real dictionary:** ~10 load-bearing entries (one per seed-task
-definition, plus one per `messify.py` pathology) and ~15–20 near-miss distractors. The
-distractors are the point — with three documents retrieval is trivially perfect and
-RAGAS measures nothing.
+**Still to come: ~15–20 near-miss distractors.** With ten documents retrieval is
+trivially perfect and RAGAS measures nothing. The distractors are what make retrieval a
+real problem — plausible, retrievable, and wrong for the specific question asked.
 
-Cassettes recorded against this provisional corpus are **disposable by design**. When
-step 4 lands, `corpus_version` changes and invalidates every one of them. That is the
-mechanism working. Re-record after step 4; do not carry them forward.
+When they land, `corpus_version` changes again and the retrieval cassettes must be
+re-recorded again. That already happened once at step 4: `c24dc219e69d4e63` (3 docs) →
+`8aebf3db5fad676c` (10 docs) invalidated every step-1 cassette, which is the mechanism
+working rather than a defect.
 
-Current `corpus_version`: `c24dc219e69d4e63` (3 documents, 3 chunks).
+Current `corpus_version`: `8aebf3db5fad676c` (10 documents, 11 chunks).
 
 ## Gitignored paths
 
