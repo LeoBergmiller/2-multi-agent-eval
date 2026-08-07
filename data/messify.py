@@ -61,6 +61,19 @@ REVERSED_STAYS_BEFORE = "2025-01-01"
 ORG_MERGER_DATE = "2025-07-01"  # encounters before this keep the old organization id
 
 
+#: Which seed tasks lose their trap if an injection silently stops landing. Named so
+#: the failure message can say what breaks rather than only what mismatched — open
+#: stays in particular carry traps in TWO tasks, so a no-op there costs more than the
+#: single count suggests. See docs/task-intents.md.
+CARRIES_TRAPS_FOR: dict[str, str] = {
+    "duplicate_encounters": "task 6 (dedupe)",
+    "open_stays": "tasks 2 (admission count) AND 3 (LOS exclusion)",
+    "reversed_stays": "task 3 (invalid-stay exclusion)",
+    "payer_casing": "task 5 (payer-name normalisation)",
+    "merged_organization": "task 4 (per-facility split)",
+}
+
+
 @dataclass(frozen=True)
 class Injection:
     """One pathology, its intended count, and what actually landed."""
@@ -264,7 +277,9 @@ def verify(results: list[Injection]) -> None:
     failed = [r for r in results if not r.ok]
     if failed:
         detail = "\n".join(
-            f"  {r.name}: intended {r.intended}, observed {r.observed}" for r in failed
+            f"  {r.name}: intended {r.intended}, observed {r.observed}"
+            f"  -> would silently disarm {CARRIES_TRAPS_FOR.get(r.name, 'unknown')}"
+            for r in failed
         )
         raise ValueError(
             "Injection count mismatch — the warehouse is NOT in the state the eval "

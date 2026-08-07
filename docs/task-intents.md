@@ -12,9 +12,11 @@ They are provisional. Step 7 may reword a question once real row counts are know
 
 **Question.** Which organizations had the most inpatient encounters in a given year, with the organization's name and city rather than its ID?
 
-**Ambiguity.** None, deliberately. `ENCOUNTERCLASS` is named explicitly, the year is explicit, and no definition-laden term appears. This is the control: it establishes that the system can do ordinary multi-hop analytic work, so a failure elsewhere is attributable to the *definition* rather than to basic competence.
+**Ambiguity.** None, and this is enforced rather than merely asserted. `ENCOUNTERCLASS` is named explicitly, the year is explicit, and no definition-laden term appears. **The organization the question asks about must be one the merged-organization injection did not touch**, so no `organization_identity` rule is needed to answer it correctly — task 4 carries that trap, where the per-facility split needs it anyway.
 
-**Plausible-but-wrong.** Nothing definitional. The available error is mechanical — grouping by `ORGANIZATION` rather than by organization identity, which the step-3 merged-organization injection punishes by splitting one hospital across two IDs. That makes this quietly less trivial than it looks, and is why it sits first rather than being dropped.
+An earlier draft had this task lean on the merged-organization injection, which made it a control and a trap at once: a task cannot be a clean floor while also requiring a dictionary entry to get right. A clean floor for `trajectory_efficiency` is worth more than a fifth trap. Every other task's step count is measured against something, and that something has to be uncontaminated.
+
+**Plausible-but-wrong.** Nothing. If the system gets this wrong the problem is not definitional, which is exactly the diagnostic value.
 
 **Exercises.** `describe_schema`, `describe_table`, `run_sql`. Metrics: `task_success`, `tool_call_accuracy`, `trajectory_efficiency` (a clean floor for step count).
 
@@ -58,7 +60,7 @@ Secondary trap, from step 3: still-admitted patients have a null `STOP`, so an a
 
 **Plausible-but-wrong.** Anchoring the window on admission rather than discharge. This is the subtle one: it produces a *lower* rate, biased non-uniformly (longer index stays lose more window), and the number looks entirely reasonable. Nothing about the output signals the error. A second plausible-but-wrong is restricting to same-facility readmissions, which undercounts and is a genuinely different metric.
 
-**Dictionary entry.** `readmission_30day`, plus the attributed-organization rule for the per-facility split.
+**Dictionary entries.** `readmission_30day`, plus `organization_identity` for the per-facility split — the step-3 merged-organization injection splits the busiest hospital across two IDs mid-2025, so grouping by `ORGANIZATION` reports one facility as two and halves its apparent volume. This trap lives here rather than in task 1 because the per-facility comparison needs the rule regardless, and task 1 has to stay a clean control.
 
 **Exercises.** Genuine fan-out — the docs lookup and the SQL work are separate `SubTask`s with a `required_order` dependency, then computation over the result. Bounded handoffs. Metrics: `context_transfer_integrity` (does the SQL Analyst re-derive what the Docs Analyst already established?), `tool_call_accuracy`, `trajectory_efficiency`.
 
@@ -110,21 +112,25 @@ Under §2 it is **not admissible in its current form**: its ground truth is no l
 
 **Exercises.** Distractor-sensitive retrieval. Metrics: **RAGAS context precision/recall** on the sub-call — the task where retrieval quality, not SQL, decides the outcome — plus `must_cite` checking that the *cited* entry is the correct one rather than merely a retrieved one.
 
+**This is also the only home for `loop_rate` in the set.** Unlike `recovery_rate`, which needs 1b's replan edge and injection machinery, `loop_rate` needs nothing that does not already exist — but nothing else here creates the conditions for a loop. Here they arise naturally: an agent that retrieves the default any-facility entry, computes, and then notices the mismatch against the question's explicit same-facility wording has a reason to go back and retrieve again.
+
+Two honest caveats on what this measures. First, a task cannot *guarantee* a loop; it can only make one likely, and the CI floor is `loop_rate = 0` because we want none. Task 7's value is being the task where a nonzero value would first appear, so the metric has somewhere to discriminate rather than reading zero by construction everywhere. Second, the strict `(tool, args_hash)` signal catches a **verbatim** re-retrieval; an agent that re-queries with slightly different wording produces a different hash and needs the no-progress half of the metric — same tool, new args, no new information. If `loop_rate` turns out to be structurally unreachable in this set once the system runs, it belongs on the deferred list with that reason, not left silently absent.
+
 ---
 
 ## Coverage check
 
 | Task | Primary trap | New tool/mechanism exercised |
 |---|---|---|
-| 1 | none (control) | `describe_schema`, `describe_table` |
+| 1 | none (clean control) | `describe_schema`, `describe_table` |
 | 2 | definitional, order-of-magnitude | `required_order`, `must_cite` |
 | 3 | definitional + data quality | `run_python`, `ResultRef` resolution |
 | 4 | definitional, subtle and non-uniform | fan-out, `context_transfer_integrity` |
 | 5 | over-tooling | `forbidden_tools` |
 | 6 | data quality (duplicates) | dedupe reasoning |
-| 7 | retrieval | RAGAS, distractor sensitivity |
+| 7 | retrieval | RAGAS, distractor sensitivity, `loop_rate` |
 
-Every one of the five `messify.py` pathologies is load-bearing for at least one task: duplicates (6), open stays (2), reversed stays (3), payer casing (5), merged organization (1). None is decorative — an injection that silently stopped landing would take a task's trap with it, which is why `messify.verify` asserts its counts.
+Every one of the five `messify.py` pathologies is load-bearing for at least one task: duplicates (6), open stays (**2 and 3**), reversed stays (3), payer casing (5), merged organization (4). None is decorative — an injection that silently stopped landing would take a task's trap with it, which is why `messify.verify` asserts its counts.
 
 **Not covered here, by design:** failure injection and recovery. `recovery_rate` needs the replan edge and the injection machinery, both of which are 1b. That task gets authored there, not retrofitted into this set.
 
