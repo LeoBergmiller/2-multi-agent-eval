@@ -1,6 +1,11 @@
-# Reversed stays (`STOP < START`)
+# Discharge before admission — reversed stays
 
-An encounter whose `STOP` precedes its `START` is **invalid data**, not a real event.
+An encounter whose **discharge is before its admission** — `STOP` earlier than `START` —
+is **invalid data**, not a real event.
+
+These are encounters where the discharge date precedes the admission date, where the
+stay appears to have ended before it began, and which therefore produce a **negative
+length of stay**.
 
 ## Rule
 

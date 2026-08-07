@@ -151,6 +151,11 @@ Planner must now emit plans with genuine fan-out: a `Plan` DAG where the docs lo
   | `import module` + `module.name()` | works | n/a |
 
   Audited both repos. This repo had one module-level by-name import of a patchable symbol (`evals/runner.py`'s `staleness_note`) — now routed through its module; the two function-local ones are safe by re-resolution but were tidied for consistency. Project 1 is clean, and instructively so: its tests patch `cli.run_ingest` and `cli.load_resources`, i.e. the *use* site, which is the by-name binding itself. Same hazard, avoided from the other side.
+- **Ninth instance — a definition is only load-bearing if the questions it governs can retrieve it.** (Ninth, not eighth: the by-name import took eighth.) `encounter_deduplication` was written, correct, and complete — and task 6's own question, "how many inpatient encounters started in 2023?", did not retrieve it at all. No lexical or semantic overlap with the word "deduplication".
+
+  **This is a new kind.** Every prior instance was something *wrong* that failed to announce itself. This was something *absent*: a load-bearing entry that existed and was right, and could not be found by the query it exists to answer. It would have surfaced in 1c as a task failure and been **misattributed to the agent** — the agent would have looked as though it ignored a definition it was never shown, and the fix would have been applied to the wrong component.
+
+  **Generalised: write the entry against the query, not just the concept.** A dictionary entry is a retrieval target before it is a piece of prose, and the questions it governs are part of its specification. Caught by probing retrieval against the seed-task phrasings rather than by reading the corpus — reading it would never have revealed this, because nothing in the entry is wrong.
 - **Replay covers the cassetted result, not the artifact behind the ref.** A replayed run's `results/` is empty by design: the recorded artifact is the `ResultRef`, not the frame it points at, and recording the frame would be a third seam. So any new path that *resolves* a ref to its file is invisible to the hermetic gate — it passes CI and fails only live. **Every new ref-consuming path needs a RECORD-mode test.** First one due with seed task 3 (`run_sql → run_python`), which is the first consumer of the frame behind a ref.
 - **No global state.** The tracer is threaded through `RunContext`. Nothing new sets a process-global.
 - **`extra="forbid"` on every contract.** It caught a partial `TaskFile` model at Gate 0.
@@ -179,7 +184,8 @@ Quant Analyst · Validator node · replan edge · failure injection · the seven
 - [ ] `messify.py` deterministic, its injected counts reported
 - [ ] `data/fixtures/` deleted; Gate 0 task re-verified against Synthea or retired, with the `Makefile` default `TASK` repointed and `runs/demo-gate0/` retired
 - [ ] 7 task intents drafted in prose (step 3.5) before the dictionary was authored
-- [ ] Metrics dictionary committed: ~10 load-bearing + ~15–20 distractors, `corpus_version` in the cassette key
+- [ ] Metrics dictionary committed: 11 load-bearing + 20 distractors, `corpus_version` in the cassette key
+- [ ] **Retrievability probed, not assumed:** every load-bearing entry is retrieved within `k` by at least one natural phrasing of a task it governs. An entry that cannot be retrieved is not load-bearing, however correct it is — see the ninth silent-failure instance. Verified by `tests/test_corpus_retrievability.py`, which is skipped without the index and must be run deliberately when the corpus changes.
 - [ ] All 5 tools, 2 resources, 2 prompts live; `LocalDockerSandbox` hardened as specified
 - [ ] Docs Analyst node; Planner emits genuine fan-out
 - [ ] 7 seed tasks, all `status: verified` with recorded method
@@ -222,6 +228,14 @@ Captured as it happens. Gate 0's retrospective was written at the boundary while
 **Why it was latent rather than broken.** `search_metric_definitions` did not exist until step 1, so nothing had ever exercised the retrieval key. The gap was written into the spec correctly and into the code incompletely, and the distance between the two was invisible until the first tool crossed the seam. The lesson generalises past this instance: **a spec clause with no code path exercising it is not implemented, whatever the code looks like.** The two-seam design was correct; one of its stated requirements simply had not been built, and no test could fail because no caller existed.
 
 **What caught it.** Not a test — recording a real cassette and reading the key material it wrote.
+
+### The load-bearing and distractor sets are not cleanly separable
+
+`readmission_30day_same_facility` was filed as a distractor and is in fact the **correct** entry for seed task 7, whose question explicitly scopes to the same organization. The load-bearing count was ten and should have been eleven.
+
+The slip is worth keeping because the cause is a real property of the design rather than carelessness: **one task's correct definition is another task's near-miss.** The same-facility entry is exactly what task 7 must retrieve and exactly what task 4 must not. "Load-bearing" and "distractor" describe a document's *role relative to a question*, not a property of the document — so a flat two-way split of the corpus was always going to mislabel something.
+
+The practical consequence for 1c: RAGAS relevance judgements have to be per-task, not per-document. A corpus-level "relevant/irrelevant" label would score task 7 wrong on the entry it most needs.
 
 ### Three instances in one sitting, and where the third one landed
 

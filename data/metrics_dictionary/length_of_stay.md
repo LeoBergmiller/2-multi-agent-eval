@@ -43,6 +43,11 @@ A definition that shifts with its own input cannot anchor a verified number.
 is the point past which an acute inpatient stay is implausible on its face, and that
 remains true regardless of what any particular warehouse contains.
 
+> **Do not "improve" this by deriving the threshold from the data.** Replacing 365 with
+> a p99 or p99.9 looks more rigorous and is strictly worse: it makes the definition a
+> function of its own input, so every ground truth computed under it silently changes
+> whenever the population does. The apparent rigour is the trap.
+
 **This threshold is load-bearing for reported statistics, not only the mean.** A p90 or
 a "share of stays exceeding a week" is computed over the truncated distribution, so
 reference SQL must apply the truncation before computing them, and must say that it did.
