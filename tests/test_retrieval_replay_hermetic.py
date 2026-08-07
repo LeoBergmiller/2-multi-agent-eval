@@ -77,11 +77,20 @@ def test_replayed_retrieval_never_imports_rag_eval() -> None:
 
 
 @pytest.mark.integration
-def test_top_hit_is_the_intended_document() -> None:
-    """Guards the corpus, not the model: each seed query must find its own definition.
+def test_intended_document_is_retrieved_within_k() -> None:
+    """Guards the corpus: each seed query must *retrieve* its own definition.
 
-    Cheap regression cover for step 4 — if authoring the real dictionary makes one of
-    these ambiguous, that is worth knowing at authoring time rather than at eval time.
+    Asserts **recall, not rank**. An earlier version required the intended document to
+    be rank 1, which passed trivially against the three-document spike corpus and would
+    now fail — because step 4's near-miss distractors deliberately outrank it on some
+    queries (`length_of_stay_calendar_days` beats `length_of_stay` on a bare "how is
+    length of stay counted"). That is the corpus working as designed: with retrieval
+    trivially perfect, RAGAS measures nothing and the task tests nothing.
+
+    Recall is the property that must hold. A definition the agent never sees makes a
+    task unanswerable rather than hard, and an unanswerable task measures nothing
+    either. Rank is what the eval is *for* — asserting it here would freeze the
+    difficulty the eval exists to observe. See D27.
     """
     expected = {
         RECORDED[0][0]: "readmission_30day",
@@ -94,5 +103,5 @@ def test_top_hit_is_the_intended_document() -> None:
         result = asyncio.run(
             client.call_tool("search_metric_definitions", {"query": query, "k": 3})
         )
-        matches = (result.structured or {})["matches"]
-        assert matches[0]["doc_id"] == doc_id, f"{query!r} -> {matches[0]['doc_id']}"
+        docs = [m["doc_id"] for m in (result.structured or {})["matches"]]
+        assert doc_id in docs, f"{query!r} did not retrieve {doc_id}: got {docs}"
