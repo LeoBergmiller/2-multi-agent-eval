@@ -266,6 +266,22 @@ Found while recording the first retrieval cassette. §6.2 specifies that the ret
 - **Why the seam knows a tool name:** this is the one place it does, and it is where §6.2 puts the knowledge deliberately. The alternative — making the corpus hash a tool *argument* — would put it in the model's hands, and a model that omitted or invented it would produce the same stale replay.
 - **Cost:** none for `run_sql`, which is unaffected and tested to be. `corpus_version` hashes the **committed** corpus, so a replayed run computes it with neither the `[rag]` extra nor an index.
 
+### D27 — Retrieval strategy: `dense`, chosen from measurement over the real corpus
+
+`config/rag_eval.yaml` carried `dense` as a placeholder with a note that hybrid was "the likely end state — but that is a measurement to make against the real corpus in step 4". Step 4 built the corpus, so the measurement was made.
+
+Over the seven seed-task queries against all 31 documents:
+
+| strategy | top-1 | recall@3 | recall@5 |
+|---|---|---|---|
+| `dense` | 3/7 | **7/7** | 7/7 |
+| `hybrid` | 5/7 | 5/7 | 7/7 |
+
+- **Choice:** `dense`.
+- **Rationale:** hybrid retrieves the right entry *first* more often, which is the more flattering number and the wrong one to optimise. The property that must not fail is **recall**: a definition the agent never sees makes a task unanswerable rather than difficult, and an unanswerable task measures nothing. Dense puts the correct entry in the top 3 for all seven queries; hybrid drops two to rank 4. Inspection of hybrid's failures shows its BM25 half keying on incidental wording — "how many admissions were there **last year**" surfaces `emergency_department_visits` — which is exactly the noise short natural-language questions produce against a lexical matcher.
+- **On dense's lower top-1 being convenient:** it is, and that is not the reason. 3/7 top-1 means an agent that grabs the first passage is wrong four times in seven, which gives the eval discriminating power — but had hybrid also achieved 7/7 recall, its better top-1 would have been the correct choice, because retrieval quality is not something to sandbag for the sake of a harder benchmark. The decision rests on recall alone.
+- **Revisit when:** the distractor set grows further, or `rerank` is on the table — it loads a second cross-encoder at `build_retriever` time and would roughly double warm warmup (D25), so it needs a recall gain to justify itself. Re-measure; do not assume.
+
 ---
 
 ### D13 — MVP cut line

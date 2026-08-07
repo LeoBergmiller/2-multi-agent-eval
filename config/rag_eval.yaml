@@ -37,10 +37,11 @@ embedding:
   query_prefix: "Represent this sentence for searching relevant passages: "
 
 retrieval:
-  # `dense` for the spike. The metrics dictionary is short, definition-laden prose where
-  # near-miss distractors differ by a few words ("30-day" vs "90-day", "midnights" vs
-  # "calendar days"), so `hybrid` is the likely end state — but that is a measurement to
-  # make against the real corpus in step 4, not a guess to bake in now.
+  # MEASURED at step 4 against the full 31-document corpus, not guessed (D27).
+  # Over the seven seed-task queries: dense recall@3 = 7/7, hybrid = 5/7. Hybrid wins
+  # top-1 (5/7 vs 3/7) but drops two correct entries to rank 4, and a definition that is
+  # not retrieved at all makes a task unanswerable rather than hard. Recall is the
+  # property that must not fail here, so dense stays.
   strategy: dense
   index_type: flat        # exact IndexFlatIP — no ANN recall loss
   top_k: 5
