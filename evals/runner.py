@@ -19,7 +19,7 @@ import yaml
 
 from analyst.artifacts import RunDirectory
 from analyst.contracts import Contract, load_eval_config
-from analyst.replay.manifest import staleness_note
+from analyst.replay import manifest
 from evals.metrics.task_success import (
     GroundTruthStatus,
     TaskSuccessResult,
@@ -137,7 +137,7 @@ def score_run(run_id: str) -> EvalReport:
 
     # Only a replayed run can be stale: a live or recording run reads the current
     # warehouse by definition.
-    stale = staleness_note() if meta.cassette_mode == "replay" else None
+    stale = manifest.staleness_note() if meta.cassette_mode == "replay" else None
 
     return EvalReport(
         run_id=run_id,
