@@ -19,9 +19,33 @@ utilisation and what payers reimburse, so it is the operational definition.
   See [[open_stays]].
 - **Exclude reversed stays** (`STOP < START`) rather than clamping them to zero. See
   [[reversed_stays]].
-- **Truncate outliers above 365 midnights to 365** before averaging.
+- **Truncate outliers above 365 midnights to 365** before averaging. See below.
 - **Deduplicate encounters first.** A double-posted stay would otherwise be counted
   twice in the distribution. See [[encounter_deduplication]].
+
+## The 365-midnight truncation
+
+**A stay longer than one year is not an acute inpatient stay.** It is either a data
+artifact — a missing or corrupted discharge — or a long-term-care, rehabilitation or
+psychiatric episode misclassified as acute. Either way it does not describe the thing
+LOS is used to manage: acute bed capacity and throughput. Left untruncated, a handful of
+such rows dominate the mean and distort any percentile above them.
+
+**Why a fixed threshold rather than a percentile of the observed distribution.** A
+truncation point derived from the data (p99, p99.9) would be reproducible in the sense
+of "recomputable", but it would make the *definition* a function of the dataset it is
+applied to. Re-seed the warehouse, change the population size, add a year of history,
+and the threshold moves — which moves length of stay, which moves every ground truth
+computed from it, with nothing in the task file recording that the definition changed.
+A definition that shifts with its own input cannot anchor a verified number.
+
+365 is therefore a **fixed clinical boundary, not a statistical one**: one calendar year
+is the point past which an acute inpatient stay is implausible on its face, and that
+remains true regardless of what any particular warehouse contains.
+
+**This threshold is load-bearing for reported statistics, not only the mean.** A p90 or
+a "share of stays exceeding a week" is computed over the truncated distribution, so
+reference SQL must apply the truncation before computing them, and must say that it did.
 
 ## Reporting
 

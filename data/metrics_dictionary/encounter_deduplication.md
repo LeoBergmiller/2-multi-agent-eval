@@ -6,6 +6,10 @@ and lands as multiple identical rows sharing one `Id`.
 **Count distinct encounters by `Id`, never rows.** A duplicate is a delivery artifact,
 not a second episode of care.
 
+This applies to **any question that counts encounters** — "how many encounters",
+"how many inpatient encounters started in a year", "encounter volume", "number of
+visits", "how many stays". Every such count is a count of distinct encounters.
+
 ## Why this is not optional
 
 `encounters` has no primary key, so the warehouse accepts duplicates without complaint.

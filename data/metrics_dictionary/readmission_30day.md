@@ -29,9 +29,16 @@ An inpatient admission is an index admission unless excluded. Exclude:
 - **Discharges against medical advice (AMA).**
 - **Still-admitted encounters.** No discharge date, so no window. See [[open_stays]].
 - **Admissions with no observable 30-day window** — those discharged within 30 days of
-  the end of the reporting period. Their outcome is unknown, not negative. Excluding
-  them shrinks the denominator; including them silently counts "not yet observed" as
-  "not readmitted".
+  the end of the reporting period.
+
+  **What this trades.** Excluding them shrinks the denominator, so the rate is computed
+  over fewer admissions and is slightly noisier, and the most recent month of activity
+  is absent from the figure. The alternative is worse: including them counts *"not yet
+  observed"* as *"not readmitted"*, which is not a neutral assumption — it can only
+  push the rate down, and it does so precisely on the newest data, which is where
+  attention usually is. A rate that improves at the reporting boundary is the classic
+  artifact this exclusion prevents. Report the count excluded so the denominator's
+  shrinkage is visible.
 
 ## Which readmissions count
 

@@ -19,8 +19,23 @@ out of filters silently rather than erroring.
 - **Readmission index admissions: exclude them.** An index admission needs a discharge
   date to anchor its follow-up window. See [[readmission_30day]].
 
-The pattern is that "include" and "exclude" are both correct, for different measures.
-State which was applied.
+## The principle behind the split
+
+"Include" and "exclude" are both correct, and the reason generalises past this entry:
+
+> **The event occurred; the interval did not complete.**
+
+An open stay is a real admission — the patient was admitted, occupies a bed, and appears
+in today's census. So any measure that *counts events* includes it. But its duration,
+its discharge date, and anything anchored on discharge do not exist yet, so any measure
+that *requires a completed interval* must exclude it rather than invent one.
+
+This is how hospitals actually report: census and admission volume include current
+inpatients; length of stay and readmission are computed on discharges. Apply the same
+test to any measure not covered here — ask whether it counts an occurrence or measures a
+completed span, and the treatment follows without needing a rule written for it.
+
+State which treatment was applied.
 
 ## Reporting
 
