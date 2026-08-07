@@ -31,8 +31,25 @@ agents are the subject under test.
 Python 3.12.3 (matches Project 1), ruff, full type hints, YAML→frozen dataclass/Pydantic configs, pytest.
 
 ## Current gate
-Gate 1 — MVP complete. See `docs/architecture.md` §10.
-**Read `docs/gate-0.md` before planning** — retrospective, deferrals, and what bit last gate.
+**Gate 1a, step 5 — remaining MCP tools.** See `docs/gate-1a.md` §2 step 5.
+Steps 1–4 are done: Project 1 retrieval integrated, Synthea ingest, `messify.py`,
+7 task intents (`docs/task-intents.md`), and the 31-entry metrics dictionary.
+
+**Read before planning:** `docs/gate-1a.md` (especially §3's carried-forward list and §7's
+accumulating retrospective), then `docs/gate-0.md`.
+
+### Resume order for step 5 — the ordering is load-bearing
+1. Build `describe_schema` / `describe_table` against the **real nine-table Synthea
+   warehouse** (`data/synthea_spec.py` has the pinned schema).
+2. **Pin `describe_table`'s output shape with a contract and a test**, including the
+   columns `messify.py` affects. Do this before anything consumes the shape.
+3. **Then** write the SQL Analyst prompt against that pinned shape. A prompt written
+   against an assumed shape is a silent-wrong waiting for the shape to drift.
+4. `run_python` + `LocalDockerSandbox` (hardening per architecture.md §9).
+5. The two resources and two prompts.
+
+Known state: `make demo` reports `GATE 0: STALE` by design — cassettes are fixture-era
+and the Gate 0 ground truth is `draft` until step 7 re-records. Not a broken build.
 
 ## Carried from Gate 0
 - `ground_truth` returns to `status: draft` the moment Synthea replaces the fixture. The number
