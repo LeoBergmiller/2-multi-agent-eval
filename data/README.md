@@ -116,25 +116,28 @@ instead of silently replaying a retrieval the edit was meant to correct**.
 under it is ingested as a document — which is why this section lives here rather than
 in a `metrics_dictionary/README.md` that would index itself as a metric definition.
 
-### Status: load-bearing set complete, distractors pending (Gate 1a step 4)
+### Status: complete (Gate 1a step 4)
 
-Ten entries, derived from the seven seed-task intents in `docs/task-intents.md` rather
-than authored exhaustively — five metric definitions (`admission`, `length_of_stay`,
-`readmission_30day`, `payer_mix_denominator`, `attributed_organization`) and one per
-`messify.py` pathology (`encounter_deduplication`, `open_stays`, `reversed_stays`,
-`payer_name_normalisation`, `organization_identity`). Ten is where task intent landed,
-not a target that was aimed for.
+**31 entries: 11 load-bearing + 20 near-miss distractors.**
 
-**Still to come: ~15–20 near-miss distractors.** With ten documents retrieval is
-trivially perfect and RAGAS measures nothing. The distractors are what make retrieval a
-real problem — plausible, retrievable, and wrong for the specific question asked.
+The load-bearing set derives from the seven seed-task intents in `docs/task-intents.md`
+rather than being authored exhaustively — five metric definitions (`admission`,
+`length_of_stay`, `readmission_30day`, `readmission_30day_same_facility`,
+`payer_mix_denominator`, `attributed_organization`) and one per `messify.py` pathology
+(`encounter_deduplication`, `open_stays`, `reversed_stays`, `payer_name_normalisation`,
+`organization_identity`).
 
-When they land, `corpus_version` changes again and the retrieval cassettes must be
-re-recorded again. That already happened once at step 4: `c24dc219e69d4e63` (3 docs) →
-`8aebf3db5fad676c` (10 docs) invalidated every step-1 cassette, which is the mechanism
-working rather than a defect.
+The **distractors are the point**. With ten documents retrieval is trivially perfect and
+RAGAS measures nothing; with the distractors in place, a naive top-1 read is wrong on
+four of the seven seed queries. They are plausible, retrievable, and *wrong for the
+specific question* — `length_of_stay_calendar_days` vs midnights, `readmission_7day` and
+`readmission_90day` vs the 30-day window, `payer_mix_by_patient` vs encounter-weighted,
+`attributed_provider` vs organization. Each names what it *is* correct for, so none is a
+strawman.
 
-Current `corpus_version`: `8aebf3db5fad676c` (10 documents, 11 chunks).
+Cross-references are checked: 31 entries, zero dangling `[[links]]`.
+
+Current `corpus_version`: `529323fa50c09ede` (31 documents, 33 chunks).
 
 ## Gitignored paths
 

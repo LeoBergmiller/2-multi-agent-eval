@@ -164,6 +164,8 @@ Planner must now emit plans with genuine fan-out: a `Plan` DAG where the docs lo
 
 Quant Analyst · Validator node · replan edge · failure injection · the seven remaining metrics · the single-agent baseline · the Streamlit app · LangSmith export · A2A · the full task set.
 
+**Carry into 1c — do not let the README overclaim `loop_rate`.** `loop_rate = 0` across the task set is only a claim about the *system* if some task could have produced a nonzero value. If no task creates the conditions for a loop, zero is a property of the task set, not evidence of reliability, and reporting it as the latter is a false claim. Task 7 is the only intended home for it (see `docs/task-intents.md`), and even there a loop is made *likely*, not guaranteed. So 1c must do one of three things and say which: report `loop_rate` alongside the count of tasks that could plausibly induce a loop; demonstrate a nonzero value on a deliberately loop-inducing case to show the metric discriminates; or move it to the deferred list with the reason. The same test applies to any metric whose floor is zero — a metric that cannot fail is not measuring anything.
+
 **LangSmith sampled export is the first thing cut if 1c runs long.** `spans.jsonl` is the source of truth and the demo app renders it; LangSmith is a viewing convenience with nothing downstream depending on it. Cut it to Gate 2 and record why.
 
 ---
